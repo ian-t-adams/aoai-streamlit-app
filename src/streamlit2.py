@@ -1,19 +1,19 @@
+
 import openai
 import streamlit as st
 #do this to load the env variables
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
 # Set up OpenAI
-openai.api_type = "azure"
+openai.api_type="azure"
 openai.api_key=env['APIM_KEY']
 openai.api_base=env['APIM_ENDPOINTS']
 openai.api_version =['APIM_VERSION']
 
 # The code gets the response from OpenAI, formats it, and writes it to the result box
-def get_openai_response(prompt, max_tokens=max_tokens, temperature=temperature, model=model, streaming=streaming):
+def get_openai_response(prompt, max_tokens, temperature, model, streaming):
     try:
         # If streaming, loop through the response and append to a list
         if streaming == "Streaming":
@@ -44,7 +44,7 @@ def get_openai_response(prompt, max_tokens=max_tokens, temperature=temperature, 
     except openai.error.RateLimitError as e:
         raise e
 
-def get_openai_Chat(messages,max_tokens=max_tokens,temperature=temperature,model=model,streaming=streaming):
+def get_openai_Chat(messages, max_tokens, temperature, model, streaming):
     try:
         # If streaming, loop through the response and append to a list
         if streaming == "Streaming":
@@ -53,7 +53,7 @@ def get_openai_Chat(messages,max_tokens=max_tokens,temperature=temperature,model
             for resp in openai.ChatCompletion.create(engine=model,
                                                     messages=messages,
                                                     max_tokens=max_tokens, 
-                                                    temperature = temperature,
+                                                    temperature=temperature,
                                                     stream=True):
                 if 'content' in resp['choices'][0]['delta']:
                     report.append(resp['choices'][0]['delta']['content'])
@@ -74,19 +74,43 @@ def get_openai_Chat(messages,max_tokens=max_tokens,temperature=temperature,model
     except openai.error.RateLimitError as e:
         raise e       
 
-st.subheader("Chat, Stream, Retry")
-
-# You can also use radio buttons instead
-options=["Streaming", "No Streaming"]
-# selected = st.radio("Choose the app", range(len(options)), format_func=lambda x: options[x])
-selected = st.radio("Choose whether to stream responses or not:", options)
-
-callEndpoints=["Completion", "Chat"]
-endpointOpt = st.radio("Choose whether you wish to engage in a ChatCompletions or Completions interaction:",callEndpoints)
-
-user_input = st.text_input("You: ", placeholder = "Ask me anything ...", value="Tell me a short joke",key="input")
-
-if st.button("Submit", type="primary"):
+st.subheader("Chat, Stream, Retry")  
+  
+options=["Streaming", "No Streaming"]  
+selected = st.radio("Choose whether to stream responses or not:", options)  
+  
+callEndpoints=["Chat", "Completion", "Embedding"]  
+endpointOpt = st.radio("Choose whether you wish to engage in a Chat (ChatCompletions) or Completions interaction for text or Embeddings for a demonstration of embeddings outputs:",callEndpoints)  
+  
+if endpointOpt == "Chat":  
+    model_options = ["gpt-35-turbo", "gpt-4", "gpt-4-32k"]  
+elif endpointOpt == "Completion":  
+    model_options = ["text-davinci-003"]  
+else:  
+    model_options = ["text-embedding-ada-002"]  
+model = st.selectbox("Choose a model:", model_options)  
+  
+# Max tokens selection with Streamlit slider  
+if model == "gpt-35-turbo":  
+    max_tokens = st.slider("Choose max tokens:", min_value=10, max_value=4000, step=10)
+    temp_options = st.slider("Choose a temperature:", min_value=0, max_value=2, step=0.01)
+    top_p_options = st.slider("Choose a top p:", min_value=0, max_value=1, step=0.01)
+elif model == "gpt-4":
+    max_tokens = st.slider("Choose max tokens:", min_value=10, max_value=8190, step=10)
+    temp_options = st.slider("Choose a temperature:", min_value=0, max_value=2, step=0.01)
+elif model == "gpt-4-32k":
+    max_tokens = st.slider("Choose max tokens:", min_value=10, max_value=32760, step=10)
+    temp_options = st.slider("Choose a temperature:", min_value=0, max_value=2, step=0.01)
+elif model == "text-davinci-003":
+    max_tokens = st.slider("Choose max tokens:", min_value=10, max_value=4000, step=10)
+    temp_options = st.slider("Choose a temperature:", min_value=0, max_value=1, step=0.01)
+else:
+    max_tokens = st.slider("Choose max tokens:", min_value=10, max_value=4000, step=10)
+    temp_options = st.slider("Choose a temperature:", min_value=0, max_value=0, step=0)  
+  
+user_input = st.text_input("You: ", placeholder = "Ask me anything ...", value="Tell me a short joke",key="input")  
+  
+if st.button("Submit", type="primary"):  
     st.markdown("----")
 
     res_box = st.empty()
@@ -95,10 +119,10 @@ if st.button("Submit", type="primary"):
     messages=[]
     messages.append({"role":"user","content":user_input})
 
-    streamIt= True if selected == "Streaming" else False
-        if endpointOpt == "Completion":
-            get_openai_response(user_input, max_tokens=120, temperature = 0.5,model="text-davinci-003",streaming=streamIt)
-        else:
-            get_openai_Chat(messages, max_tokens=120, temperature = 0.5,model="gpt-35-turbo",streaming=streamIt)
+    streaming=True if selected == "Streaming" else False
+    if endpointOpt == "Completion":
+        get_openai_response(user_input, max_tokens, temp_options, model, streaming)
+    else:
+        get_openai_Chat(messages, max_tokens, temp_options, model, streaming)
 
 st.markdown("----")
