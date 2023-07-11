@@ -11,7 +11,7 @@ if __name__ == "__main__":
     openai.api_base = os.environ['APIM_ENDPOINT']  
     openai.api_version = os.environ['AOAI_API_VERSION']  
   
-    def get_openai_response(prompt, max_tokens, temperature, model, streaming):  
+    def generate_aoai_completion(prompt, max_tokens, temperature, model, streaming):  
         try:  
             if streaming == "Streaming":  
                 report = []  
@@ -38,7 +38,7 @@ if __name__ == "__main__":
         except openai.error.RateLimitError as e:  
             raise e  
   
-    def get_openai_Chat(messages, max_tokens, temperature, model, streaming):  
+    def generate_aoai_chatcompletion(messages, max_tokens, temperature, model, streaming):  
         try:  
             if streaming == "Streaming":  
                 report = []  
@@ -65,7 +65,8 @@ if __name__ == "__main__":
         except openai.error.RateLimitError as e:  
             raise e
 
-    st.sidebar.title("Configuration")  
+    options = ["Streaming", "No Streaming"]  
+    selected = st.sidebar.radio("Choose whether to stream responses or not:", options, key="uniquekey2")  
 
     # Create a dictionary containing the available models for each completion type  
     available_models = {  
@@ -109,8 +110,8 @@ if __name__ == "__main__":
         max_tokens = st.sidebar.slider("Choose max tokens:", min_value=10, max_value=4000, step=10)  
         temp_options = st.sidebar.slider("Choose a temperature:", min_value=0, max_value=0, step=0.01)  
   
-    options = ["Streaming", "No Streaming"]  
-    selected = st.sidebar.radio("Choose whether to stream responses or not:", options, key="uniquekey2")  
+    # options = ["Streaming", "No Streaming"]  
+    # selected = st.sidebar.radio("Choose whether to stream responses or not:", options, key="uniquekey2")  
   
     st.subheader("Chat with AOAI!")  
     user_input = st.text_input("You: ", placeholder="Ask me anything ...", value="Tell me a short joke", key="input")  
@@ -126,8 +127,8 @@ if __name__ == "__main__":
   
         streaming = True if selected == "Streaming" else False  
         if completion_type == "Completion":  
-            get_openai_response(user_input, max_tokens, temp_options, model, streaming)  
+            generate_aoai_completion(user_input, max_tokens, temp_options, model, streaming)  
         else:  
-            get_openai_Chat(messages, max_tokens, temp_options, model, streaming)  
+            generate_aoai_chatcompletion(messages, max_tokens, temp_options, model, streaming)  
   
     st.markdown("----")  
