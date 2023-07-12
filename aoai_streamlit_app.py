@@ -46,6 +46,7 @@ model = st.sidebar.selectbox("Choose a model:", model_options, key="modelkey", h
 # Then, when a model is selected, load the parameters for that model
 params = aoai.model_params.get(model, {})
 
+# Read in the appropriate model specific parameters
 temperature = st.sidebar.slider("Set a temperature:", min_value=params['temp_min'], max_value=params['temp_max'], step=params["temp_step"], help=params['temp_help'], key="tempkey")
 max_tokens = st.sidebar.slider("Set max_tokens:", min_value=params['tokens_min'], max_value=params['tokens_max'], step=params["tokens_step"], help=params['tokens_help'], key="tokenskey")
 top_p = st.sidebar.slider("Set top_p:", min_value=params['top_p_min'], max_value=params['top_p_max'], step=params["top_p_step"], help=params['top_p_help'], key="top_pkey")
@@ -56,64 +57,45 @@ if selected == "Stream":
 else:
     stream = False
 
-# engine, messages, temperature, max_tokens, top_p, frequency_penalty, presence_penalty, stop, stream
+
 st.subheader("💬 Window")
-if "messages" not in st.session_state:
-    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
 
-for msg in st.session_state.messages:
-    st.chat_message(msg["role"]).write(msg["content"])
+user_input = st.text_input("You: ", placeholder="Ask me anything ...", value="Tell me a short joke", key="input")  
 
-# if prompt := st.chat_input():
+if st.button("Submit", type="primary"):  
+    st.markdown("----")  
 
-#     st.session_state.messages.append({"role": "user", "content": prompt})
-#     st.chat_message("user").write(prompt)
-#     # response = openai.ChatCompletion.create(engine="gpt-4-32k", messages=st.session_state.messages)
-#     response = aoai.generate_chat_completion(engine=model,
-#                                              messages=st.session_state.messages,
-#                                              temperature=temperature,
-#                                              max_tokens=max_tokens,
-#                                              top_p=top_p,
-#                                              frequency_penalty=frequency_penalty,
-#                                              presence_penalty=presence_penalty,
-#                                              stop=None,
-#                                              stream=stream)
-#     msg = response.choices[0].message
-#     st.session_state.messages.append(msg)
-#     st.chat_message("assistant").write(msg.content)
+    res_box = st.empty()  
+    exp = st.expander("See more info")  
 
-if prompt := st.chat_input():  
-  
-    st.session_state.messages.append({"role": "user", "content": prompt})  
-    st.chat_message("user").write(prompt)  
-  
-    response_generator = aoai.generate_chat_completion(engine=model,  
-                                             messages=st.session_state.messages,  
-                                             temperature=temperature,  
-                                             max_tokens=max_tokens,  
-                                             top_p=top_p,  
-                                             frequency_penalty=frequency_penalty,  
-                                             presence_penalty=presence_penalty,  
-                                             stop=None,  
-                                             stream=stream)  
-  
-    for response in response_generator:  
-        msg = response.choices[0].message  
-        st.session_state.messages.append(msg)  
-        st.chat_message("assistant").write(msg.content)  
+    messages = []  
+    messages.append({"role": "user", "content": user_input})
+ 
+    if stream == True:
+        streaming_content = []
+        for response in aoai.generate_chat_completion(engine=model,
+                                                        messages=messages,
+                                                        temperature=temperature,
+                                                        max_tokens=max_tokens,
+                                                        top_p=top_p,
+                                                        frequency_penalty=frequency_penalty,
+                                                        presence_penalty=presence_penalty,
+                                                        stop=None,
+                                                        stream=stream):
+            if 'content' in response['choices'][0]['delta']:  
+                        streaming_content.append(response['choices'][0]['delta']['content'])  
+                        result = "".join(streaming_content).strip()  
+                        result = result.replace("\n", "")  
+                        res_box.markdown(f'*{result}*') 
+    else:
+         completion_response = aoai.generate_chat_completion(engine=model,
+                                                        messages=messages,
+                                                        temperature=temperature,
+                                                        max_tokens=max_tokens,
+                                                        top_p=top_p,
+                                                        frequency_penalty=frequency_penalty,
+                                                        presence_penalty=presence_penalty,
+                                                        stop=None,
+                                                        stream=stream)
 
-query=st.text_input("input your query",value="Tell me a joke")
-ask_button=st.button("ask") 
-
-st.markdown("### streaming box")
-# here is the key, setup a empty container first
-chat_box=st.empty() 
-stream_handler = StreamHandler(chat_box)
-chat = ChatOpenAI(max_tokens=25, streaming=True, callbacks=[stream_handler])
-
-st.markdown("### together box")  
-
-if query and ask_button: 
-    response = chat([HumanMessage(content=query)])    
-    llm_response = response.content  
-    st.markdown(llm_response)
+st.markdown("----")   
