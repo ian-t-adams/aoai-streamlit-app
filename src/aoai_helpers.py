@@ -1,3 +1,4 @@
+import os
 import openai
 import tiktoken
 import streamlit as st
@@ -10,26 +11,6 @@ def generate_chat_completion(engine, messages, temperature, max_tokens, top_p, f
         response = openai.ChatCompletion.create(
             engine=engine,
             messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            top_p=top_p,
-            frequency_penalty=frequency_penalty,
-            presence_penalty=presence_penalty,
-            stop=stop,
-            stream=stream
-        )
-        return response
-    except openai.error.RateLimitError as e:
-        raise e
-    
-def generate_completion(engine, prompt, temperature, max_tokens, top_p, frequency_penalty, presence_penalty, stop, stream):
-    '''
-    Generates a completion based on the provided prompt.
-    '''
-    try:
-        response = openai.Completion.create(
-            engine=engine,
-            prompt=prompt,
             temperature=temperature,
             max_tokens=max_tokens,
             top_p=top_p,
@@ -231,4 +212,31 @@ model_params = {
         },  
     # Add more models here...  
     }
-    
+
+def load_setting(setting_name, session_name, default_value):  
+    """  
+    Function to load the setting information from session  
+    """  
+    if session_name not in st.session_state:  
+        if os.environ.get(setting_name) is not None:
+            st.session_state[session_name] = os.environ.get(setting_name)
+        else:
+            st.session_state[session_name] = default_value
+
+def toggle_settings():
+    st.session_state['show_settings'] = not st.session_state['show_settings']
+
+def save_session_state():
+    st.session_state.apitype = st.session_state.apitype 
+    st.session_state.apiversion = st.session_state.apiversion 
+    st.session_state.apikey = st.session_state.apikey 
+    st.session_state.apiendpoint = st.session_state.apiendpoint
+    st.session_state.engine = st.session_state.modelkey
+    st.session_state.temperature = st.session_state.tempkey 
+    st.session_state.maxtokens = st.session_state.tokenskey 
+    st.session_state.topp = st.session_state.top_pkey 
+    st.session_state.frequencypenalty = st.session_state.frequency_penaltykey
+    st.session_state.presencepenalty = st.session_state.presence_penaltykey
+    # We can close out the settings now
+    st.session_state.show_settings = False
+    st.session_state.messages[0]['content'] = st.session_state.system
