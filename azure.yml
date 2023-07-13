@@ -1,8 +1,8 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
 
-name: OpenAIWorkshop
+name: AOAI_Streamlit_App
 services:
   web:
-    project: ./scenarios/incubations/automating_analytics
+    project: ../aoai-streamlit-app
     language: py
     host: appservice
