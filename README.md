@@ -23,3 +23,10 @@ Azure hosted Streamlit App centered around Azure OpenAI Service LLM's
     > streamlit run C:\{path\to\aoai-streamlit-app\repo}\aoai_streamlit_app.py
 
 5. Enjoy
+
+## Things to add or do
+
+1. Persistent stateliness - Cosmos?
+2. Prompt Flow tracking? Prompt versioning - Delta lake?
+3. Rate responses / Human-in-the-loop / feedback loop
+4. ???
