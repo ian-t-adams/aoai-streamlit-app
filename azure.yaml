@@ -2,7 +2,7 @@
 
 name: AOAI_Streamlit_App
 services:
-  web:
+  aoai-streamlit-app:
     project: ../aoai-streamlit-app
     language: py
     host: appservice
