@@ -5,6 +5,21 @@ targetScope = 'subscription'
 @description('Name of the the environment which is used to generate a short unique hash used in all resources.')
 param environmentName string
 
+// Prompt user for apimEndpoint, apimKey, and serviceName if not provided
+@description('API-M endpoint')
+param apimEndpoint string 
+
+// Make this one secure as it's a key
+@secure()
+@description('API-M key')
+param apimKey string
+
+@description('Name of the web app and web service')
+param serviceName string = 'aoai-streamlit-app'
+
+@description('Azure OpenAI API version')
+param aoaiApiVersion string = '2023-05-15'
+
 @minLength(1)
 @description('Primary location for all resources')
 param location string
@@ -12,10 +27,6 @@ param location string
 param appServicePlanName string = ''
 param resourceGroupName string = ''
 param webServiceName string = ''
-// serviceName is used as value for the tag (azd-service-name) azd uses to identify
-param serviceName string = 'aoai-streamlit-app'
-
-// param webServiceName string = 'app-dai-${environmentName}-${take(location,24)}'
 
 // Load the abbreviations.json file to use in resource names
 var abbrs = loadJsonContent('./abbreviations.json')
@@ -28,6 +39,7 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   location: location
   tags: tags
 }
+
 // Create an App Service Plan to group applications under the same payment plan and SKU
 // aoai-streamlit-app\infra\core
 module appServicePlan '../infra/core/host/appserviceplan.bicep' = {
@@ -57,7 +69,13 @@ module web './core/host/appservice.bicep' = {
     runtimeName: 'python'
     runtimeVersion: '3.11'
     scmDoBuildDuringDeployment: true
-    appCommandLine: 'python -m streamlit run aoai_streamlit_app.py --server.port 8000 --server.address 0.0.0.0'
+    appCommandLine: 'python -m streamlit run aoai_streamlit_app.py --server.port 8000 --server.address 0.0.0.0' // Add these back at some point to pass as parameters to the aoai_streamlit_app.py file --apim-endpoint ${apimEndpoint} --apim-key ${apimKey}'
+    // Add environment variables
+    appSettings: {
+      APIM_ENDPOINT: apimEndpoint
+      APIM_KEY: apimKey
+      AOAI_API_VERSION: aoaiApiVersion
+    }
   }
 }
 
@@ -65,3 +83,4 @@ module web './core/host/appservice.bicep' = {
 output AZURE_TENANT_ID string = tenant().tenantId
 output REACT_APP_WEB_BASE_URL string = web.outputs.uri
 output resourceGroupName string = rg.name
+output webServiceName string = web.name
