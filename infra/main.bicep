@@ -69,7 +69,7 @@ module web './core/host/appservice.bicep' = {
     runtimeName: 'python'
     runtimeVersion: '3.11'
     scmDoBuildDuringDeployment: true
-    appCommandLine: 'python -m streamlit run aoai_streamlit_app.py --server.port 8000 --server.address 0.0.0.0' // Add these back at some point to pass as parameters to the aoai_streamlit_app.py file --apim-endpoint ${apimEndpoint} --apim-key ${apimKey}'
+    appCommandLine: 'python -m streamlit run ./src/aoai_streamlit_app.py --server.port 8000 --server.address 0.0.0.0' // Add these back at some point to pass as parameters to the aoai_streamlit_app.py file --apim-endpoint ${apimEndpoint} --apim-key ${apimKey}'
     // Add environment variables
     appSettings: {
       APIM_ENDPOINT: apimEndpoint

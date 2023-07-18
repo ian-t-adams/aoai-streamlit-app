@@ -133,26 +133,26 @@ if prompt := st.chat_input("💬 Window - Go ahead and type!"):
 
 
 # ###UPDATE 07/16/2023 - Add in ability to pass parameters for apim endpoint, key, and aoai_version
-'''
-import argparse
-import os
-import streamlit as st
+# '''
+# import argparse
+# import os
+# import streamlit as st
 
-# Define the command line arguments
-parser = argparse.ArgumentParser()
-parser.add_argument('--apim-endpoint', type=str, required=True, help='The Azure OpenAI API Management endpoint')
-parser.add_argument('--apim-key', type=str, required=True, help='The Azure OpenAI API Management key')
-args = parser.parse_args()
+# # Define the command line arguments
+# parser = argparse.ArgumentParser()
+# parser.add_argument('--apim-endpoint', type=str, required=True, help='The Azure OpenAI API Management endpoint')
+# parser.add_argument('--apim-key', type=str, required=True, help='The Azure OpenAI API Management key')
+# args = parser.parse_args()
 
-# Set the environment variables
-os.environ['APIM_ENDPOINT'] = args.apim_endpoint
-os.environ['APIM_KEY'] = args.apim_key
+# # Set the environment variables
+# os.environ['APIM_ENDPOINT'] = args.apim_endpoint
+# os.environ['APIM_KEY'] = args.apim_key
 
-# Define the Streamlit app
-def main():
-    # Your Streamlit app code here
-    pass
+# # Define the Streamlit app
+# def main():
+#     # Your Streamlit app code here
+#     pass
 
-if __name__ == '__main__':
-    main()
-'''
+# if __name__ == '__main__':
+#     main()
+# '''
