@@ -6,7 +6,7 @@ import os
 import openai
 import streamlit as st
 from dotenv import load_dotenv  
-import src.aoai_helpers as aoai
+import aoai_helpers as helpers
 
 load_dotenv()  
 
@@ -15,20 +15,19 @@ openai.api_key = os.environ['APIM_KEY']
 openai.api_base = os.environ['APIM_ENDPOINT']  
 openai.api_version = os.environ['AOAI_API_VERSION']
 
-# engine, messages, temperature, max_tokens, top_p, frequency_penalty, presence_penalty, stop, stream)
-# load_setting(setting_name, session_name, default_value)
+
 # Pre-load environment variables to point to our API-M endpoint and key from our .env file
-aoai.load_setting('AOAI_API_TYPE','apitype','azure')
-aoai.load_setting('AOAI_API_VERSION','apiversion','2023-05-15')
-aoai.load_setting('APIM_KEY','apikey','')
-aoai.load_setting('APIM_ENDPOINT','apiendpoint','')
+helpers.load_setting('AOAI_API_TYPE','apitype','azure')
+helpers.load_setting('AOAI_API_VERSION','apiversion','2023-05-15')
+helpers.load_setting('APIM_KEY','apikey','')
+helpers.load_setting('APIM_ENDPOINT','apiendpoint','')
 # Load in some Streamlit sidebar settings
-aoai.load_setting('ST_ENGINE','engine','gpt-35-turbo-16k')
-aoai.load_setting('ST_TEMPERATURE', 'temperature', 0.5)
-aoai.load_setting('ST_MAX_TOKENS', 'maxtokens', 800)
-aoai.load_setting('ST_TOP_P', 'topp', 0.90)
-aoai.load_setting('ST_FREQUENCY_PENALTY', 'frequencypenalty', 0.0)
-aoai.load_setting('ST_PRESENCE_PENALTY', 'presencepenalty', 0.0)
+helpers.load_setting('ST_ENGINE','engine','gpt-35-turbo-16k')
+helpers.load_setting('ST_TEMPERATURE', 'temperature', 0.5)
+helpers.load_setting('ST_MAX_TOKENS', 'maxtokens', 800)
+helpers.load_setting('ST_TOP_P', 'topp', 0.90)
+helpers.load_setting('ST_FREQUENCY_PENALTY', 'frequencypenalty', 0.0)
+helpers.load_setting('ST_PRESENCE_PENALTY', 'presencepenalty', 0.0)
 
 st.title("Interact with a 🤖")
 
@@ -38,13 +37,13 @@ if 'show_settings' not in st.session_state:
 
 # Pull up the messages if they exist
 if 'messages' not in st.session_state:
-    aoai.load_setting('SYSTEM','system', "Please insert your system message to define your Assistant.")
+    helpers.load_setting('SYSTEM','system', "Please insert your system message to define your Assistant.")
     st.session_state.messages = []
     st.session_state.messages.append({"role":"system","content":st.session_state.system})
 
 
 with st.sidebar:
-    st.button("Settings",on_click=aoai.toggle_settings)
+    st.button("Settings",on_click=helpers.toggle_settings)
     if st.session_state['show_settings']:  
         # Create a dictionary containing the available models for each completion type 
         # ###UPDATE 07/12/2023 first round will only accomodate the Chat models until gpt-35-turbo-instruct is released
@@ -74,15 +73,15 @@ with st.sidebar:
 
         # Then, when a model is selected, load the parameters for that model
         if model is not None:
-            params = aoai.model_params[model]
+            params = helpers.model_params[model]
         else:
-            params = aoai.model_params["gpt-35-turbo"]
+            params = helpers.model_params["gpt-35-turbo"]
 
         with st.form("AOAI_Model_Parameters"):
             # Create a system message box so users may supply their own system message
             st.text_area("System Message", value=st.session_state.system,height=100,key="txtSystem")
             # Read in the appropriate model specific parameters for the streamlit sliders - these all come from the dictionary in aoai_helpers.py
-            # These are passed into the appropriate aoai.generate_ function calls
+            # These are passed into the appropriate helpers.generate_ function calls
             # Default values are set with value= and are not defined in the dictionary
             temperature = st.slider(label="Set a temperature:", min_value=params['temp_min'], max_value=params['temp_max'], value=st.session_state.temperature,
                                             step=params["temp_step"], help=params['temp_help'], key="tempkey")
@@ -95,7 +94,7 @@ with st.sidebar:
             presence_penalty = st.slider(label="Set presence_penalty:", min_value=params['presence_penalty_min'], max_value=params['presence_penalty_max'], value=st.session_state.presencepenalty,
                                                 step=params["presence_penalty_step"], help=params['presence_penalty_help'], key="presence_penaltykey")
             # Save the chosen parameters to the system state upon submission
-            st.form_submit_button("Save Parameters",on_click=aoai.save_session_state)
+            st.form_submit_button("Save Parameters",on_click=helpers.save_session_state)
 
     st.button("Clear All Settings and Chat",on_click=lambda: st.session_state.clear())
 
@@ -113,12 +112,8 @@ if prompt := st.chat_input("💬 Window - Go ahead and type!"):
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
-        # openai.api_type="azure"
-        # openai.api_base = f"https://{st.session_state.aoairegion}.api.cognitive.microsoft.com/"
-        # openai.api_key = st.session_state.aoaikey
-        # openai.api_version = st.session_state.aoaiversion
 
-        for response in aoai.generate_chat_completion(engine=st.session_state.engine,
+        for response in helpers.generate_chat_completion(engine=st.session_state.engine,
                                                         messages=[
                                                             {"role": m["role"], "content": m["content"]}
                                                             for m in st.session_state.messages
@@ -130,17 +125,34 @@ if prompt := st.chat_input("💬 Window - Go ahead and type!"):
                                                         presence_penalty=st.session_state.presencepenalty,
                                                         stop=None,
                                                         stream=True):
-        # openai.ChatCompletion.create(
-        #     engine=st.session_state.deployment,
-        #     messages=[
-        #         {"role": m["role"], "content": m["content"]}
-        #         for m in st.session_state.messages
-        #     ],
-        #     temperature=float(st.session_state.temperature),
-        #     max_tokens=int(st.session_state.tokens),
-        #     stream=True,
-        # ):
+
             full_response += response.choices[0].delta.get("content", "")
             message_placeholder.markdown(full_response + "▌")
         message_placeholder.markdown(full_response)
     st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+
+# ###UPDATE 07/16/2023 - Add in ability to pass parameters for apim endpoint, key, and aoai_version
+# '''
+# import argparse
+# import os
+# import streamlit as st
+
+# # Define the command line arguments
+# parser = argparse.ArgumentParser()
+# parser.add_argument('--apim-endpoint', type=str, required=True, help='The Azure OpenAI API Management endpoint')
+# parser.add_argument('--apim-key', type=str, required=True, help='The Azure OpenAI API Management key')
+# args = parser.parse_args()
+
+# # Set the environment variables
+# os.environ['APIM_ENDPOINT'] = args.apim_endpoint
+# os.environ['APIM_KEY'] = args.apim_key
+
+# # Define the Streamlit app
+# def main():
+#     # Your Streamlit app code here
+#     pass
+
+# if __name__ == '__main__':
+#     main()
+# '''

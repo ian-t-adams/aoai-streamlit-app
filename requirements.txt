@@ -1,6 +1,7 @@
 streamlit==1.24.0
 openai==0.27.8
 tiktoken==0.4.0
+python-dotenv==0.21.0
 
 # Ian pip freeze 07/07/23
 # aiohttp==3.8.4
