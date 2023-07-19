@@ -72,8 +72,21 @@ with st.sidebar.title("Model Parameters", anchor="top", help='''The model parame
         params = helpers.model_params[model]
     else:
         params = helpers.model_params["gpt-35-turbo-16k"]
+    
     # Create a system message box so users may supply their own system message
-    st.sidebar.text_area("System Message", value=st.session_state.system, height=150, key="txtSystem", help='''Enter a system message here. This is where you define the personality, rules of behavior, and guardrails for your Assistant.''')
+    system_message = st.sidebar.text_area("System Message",
+                                          value=st.session_state.system,
+                                          height=150,
+                                          key="txtSystem",
+                                          help='''Enter a system message here.
+                                           This is where you define the personality, rules of behavior, and guardrails for your Assistant.
+                                           Don't forget to click the "Save Model Parameter Settings" button after making changes.''')
+
+    # Check if the system message has been updated and the save button has not been clicked
+    if system_message != st.session_state.system:
+        st.sidebar.warning('''WARNING: You have made changes to the system message.
+                           Click the "Save Model Parameter Settings" save the new message.''')
+
     # Read in the appropriate model specific parameters for the streamlit sliders - these all come from the dictionary in aoai_helpers.py
     # These are passed into the appropriate helpers.generate_ function calls
     # Default values are set with value= and are not defined in the dictionary
@@ -89,13 +102,25 @@ with st.sidebar.title("Model Parameters", anchor="top", help='''The model parame
                                         step=params["presence_penalty_step"], help=params['presence_penalty_help'], key="presence_penaltykey")
 
     # Save the chosen parameters to the system state upon submission
-    st.sidebar.button("Save Model Parameter Settings",
+    if st.sidebar.button("Save Model Parameter Settings",
                 on_click=helpers.save_session_state(),
                 key="saveButton",
                 help='''Save the model parameter settings to the session state.''',
-                type="secondary")
-    
-    # st.sidebar.success('Settings saved successfully!', icon="✅")
+                type="secondary"):    
+        st.sidebar.success('Settings saved successfully!', icon="✅")
+    # Add a button for clearing settings
+    if st.sidebar.button("Reset Parameters",
+                         help='''Clear all settings from the session state except for the system message.''',
+                         key="sidebarResetParameters",
+                         type="secondary"):
+        helpers.clear_settings()  # Resets all settings to None
+
+    # Add a button for clearing all settings and chat history
+    if st.sidebar.button("Clear All Settings and Chat History",
+                         help='''Clear all settings and chat history from the session state.''',
+                         key="sidebarClearAll",
+                         type="primary"):
+        st.session_state.clear()
 
 with chat_container:
     if st.session_state['messages']:
@@ -132,6 +157,16 @@ with chat_container:
         st.session_state.messages.append({"role": "assistant", "content": full_response})
 
 with footer_container:
+    # Change the button to only clear the chat history
+    if st.button("Clear Chat History",
+                 help='''Clear the chat history from the session state.''',
+                 key="mainChatClear",
+                 type="secondary"):
+        st.session_state.messages = []
+        st.session_state.messages.append({"role":"system","content":st.session_state.system})
+        st.session_state["user_message"] = ""
+        st.session_state["assistant_message"] = ""
+
     st.button("Clear All Settings and Chat History",
           on_click=lambda: st.session_state.clear(),
           type="primary",
