@@ -1,4 +1,5 @@
 import os
+import time
 import openai
 import tiktoken
 import streamlit as st
@@ -213,15 +214,34 @@ model_params = {
     # Add more models here...  
     }
 
-def load_setting(setting_name, session_name, default_value):  
+def env_to_st_session_state(setting_name, session_name, default_value):  
     """  
-    Function to load the setting information from session  
+    Function to generate st.session_state variables from environment variables.  
     """  
     if session_name not in st.session_state:  
         if os.environ.get(setting_name) is not None:
             st.session_state[session_name] = os.environ.get(setting_name)
         else:
             st.session_state[session_name] = default_value
+
+def load_settings(reload_api_settings=True):
+    # These set the default values for the sidebar optoins and are used in aoai_streamlit_app.py
+    # This is what values return to when reset is clicked
+    env_to_st_session_state('ST_ENGINE', 'engine', 'gpt-35-turbo-16k')
+    env_to_st_session_state('ST_TEMPERATURE', 'temperature', 0.5)
+    env_to_st_session_state('ST_MAX_TOKENS', 'maxtokens', 4000)
+    env_to_st_session_state('ST_TOP_P', 'topp', 0.90)
+    env_to_st_session_state('ST_FREQUENCY_PENALTY', 'frequencypenalty', 0.0)
+    env_to_st_session_state('ST_PRESENCE_PENALTY', 'presencepenalty', 0.0)
+
+    # These are the default values for the API settings
+    # only loaded if reload_api_settings = True
+    if reload_api_settings:
+        # Load in the API settings if requested
+        env_to_st_session_state('AOAI_API_TYPE', 'apitype', 'azure')
+        env_to_st_session_state('AOAI_API_VERSION', 'apiversion', '2023-05-15')
+        env_to_st_session_state('APIM_KEY', 'apikey', '')
+        env_to_st_session_state('APIM_ENDPOINT', 'apiendpoint', '')
 
 def toggle_settings():
     st.session_state['show_settings'] = not st.session_state['show_settings']
@@ -237,6 +257,5 @@ def save_session_state():
     st.session_state.topp = st.session_state.top_pkey 
     st.session_state.frequencypenalty = st.session_state.frequency_penaltykey
     st.session_state.presencepenalty = st.session_state.presence_penaltykey
-    # We can close out the settings now
-    st.session_state.show_settings = False
+    st.session_state.system = st.session_state.txtSystem 
     st.session_state.messages[0]['content'] = st.session_state.system
