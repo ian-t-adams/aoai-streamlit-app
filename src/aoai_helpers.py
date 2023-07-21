@@ -259,17 +259,3 @@ def save_session_state():
     st.session_state.presencepenalty = st.session_state.presence_penaltykey
     st.session_state.system = st.session_state.txtSystem 
     st.session_state.messages[0]['content'] = st.session_state.system
-
-def clear_settings():
-    """Clear all settings but the system message from the session state."""
-    st.session_state.apitype = None
-    st.session_state.apiversion = None
-    st.session_state.apikey = None
-    st.session_state.apiendpoint = None
-    st.session_state.engine = None
-    st.session_state.temperature = None
-    st.session_state.maxtokens = None
-    st.session_state.topp = None
-    st.session_state.frequencypenalty = None
-    st.session_state.presencepenalty = None
-    # st.session_state.system = None
