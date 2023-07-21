@@ -22,6 +22,7 @@ helpers.load_settings(reload_api_settings=True)
 header_container = st.container()
 chat_container = st.container()
 footer_container = st.container()
+token_counter_container = st.container()
 
 # Top level title and description of the app
 with header_container:
@@ -155,6 +156,22 @@ with chat_container:
                 message_placeholder.markdown(full_response + "▌")
             message_placeholder.markdown(full_response)
         st.session_state.messages.append({"role": "assistant", "content": full_response})
+        with token_counter_container:
+            st.empty()  # Clear the container before updating
+            system_tokens = helpers.num_tokens_from_messages([st.session_state.messages[0]], st.session_state.engine)
+            user_tokens = helpers.num_tokens_from_messages([msg for msg in st.session_state.messages if msg["role"] == "user"], st.session_state.engine)
+            assistant_tokens = helpers.num_tokens_from_messages([msg for msg in st.session_state.messages if msg["role"] == "assistant"], st.session_state.engine)
+            total_tokens = system_tokens + user_tokens + assistant_tokens
+
+            st.write(f"System tokens: {system_tokens}")
+            st.write(f"User tokens: {user_tokens}")
+            st.write(f"Assistant tokens: {assistant_tokens}")
+            st.write(f"Total tokens: {total_tokens}")
+
+            # Progress bar
+            max_tokens = st.session_state.maxtokens
+            progress = total_tokens / max_tokens
+            st.progress(progress)
 
 with footer_container:
     # Change the button to only clear the chat history
