@@ -171,7 +171,7 @@ with chat_container:
         st.session_state.messages.append({"role": "assistant", "content": full_response})
 
 with footer_container:
-    st.caption(f":red[___________________________________________________________________________________________]")
+    st.caption(f":red[______________________________________________________________________________________________]")
     st.caption(f":red[NOTE: ALL SYSTEM MESSAGES, PROMPTS, AND COMPLETIONS ARE LOGGED FOR THIS DEMO. DO NOT ENTER ANY SENSITIVE INFORMATION.]")
 
 # # Path: aoai-streamlit-app\src\aoai_streamlit_app.py
