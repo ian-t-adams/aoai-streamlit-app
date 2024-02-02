@@ -14,7 +14,7 @@ Azure hosted Streamlit App centered around Azure OpenAI Service LLM's
 
         APIM_KEY={your Azure OpenAI Key}
 
-        AOAI_API_VERSION=2023-05-15
+        AOAI_API_VERSION=2023-12-01-preview
 
 3. Install the necessary Python dependencies
 

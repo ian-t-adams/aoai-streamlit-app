@@ -18,7 +18,7 @@ param apimKey string
 param serviceName string = 'aoai-streamlit-app'
 
 @description('Azure OpenAI API version')
-param aoaiApiVersion string = '2023-05-15'
+param aoaiApiVersion string = '2023-12-01-preview'
 
 @minLength(1)
 @description('Primary location for all resources')
@@ -69,7 +69,7 @@ module web './core/host/appservice.bicep' = {
     runtimeName: 'python'
     runtimeVersion: '3.11'
     scmDoBuildDuringDeployment: true
-    appCommandLine: 'python -m streamlit run ./src/aoai_streamlit_app.py --server.port 8000 --server.address 0.0.0.0' // Add these back at some point to pass as parameters to the aoai_streamlit_app.py file --apim-endpoint ${apimEndpoint} --apim-key ${apimKey}'
+    appCommandLine: 'python -m streamlit run ../src/aoai_streamlit_app.py --server.port 8000 --server.address 0.0.0.0' // Add these back at some point to pass as parameters to the aoai_streamlit_app.py file --apim-endpoint ${apimEndpoint} --apim-key ${apimKey}'
     // Add environment variables
     appSettings: {
       APIM_ENDPOINT: apimEndpoint
