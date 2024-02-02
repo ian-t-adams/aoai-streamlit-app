@@ -6,7 +6,7 @@ import os
 import openai
 import streamlit as st
 from dotenv import load_dotenv  
-from src.aoai_helpers import aoai_helpers as helpers
+from src import aoai_helpers as helpers
 
 load_dotenv()  
 
