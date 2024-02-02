@@ -43,9 +43,16 @@ with st.sidebar.title("Model Parameters", anchor="top", help='''The model parame
 
         # Create a dictionary containing the available models for each completion type 
         # ###UPDATE 07/12/2023 first round will only accomodate the Chat models until gpt-35-turbo-instruct is released
+        # ###UPDATE 01/30/2024 - added new models, still keeping just chat for now
         available_models = {  
-            "Chat": ["gpt-4", "gpt-4-32k", "gpt-35-turbo", "gpt-35-turbo-16k"],  
-            #"Completion": ["text-davinci-003"],  
+            "Chat": ["gpt-35-turbo-0301",
+                     "gpt-35-turbo-0613",
+                     "gpt-35-turbo-1106",
+                     "gpt-35-turbo-16k",
+                     "gpt-4",
+                     "gpt-4-32k",
+                     "gpt-4-turbo"], # ["gpt-4", "gpt-4-32k", "gpt-35-turbo", "gpt-35-turbo-16k"], 
+            #"Completion": ["text-davinci-003", "gpt-35-turbo-instruct"],  
             #"Embedding": ["text-embedding-ada-002"]  
         }
 
@@ -165,7 +172,8 @@ with chat_container:
                                                             stop=None,
                                                             stream=True):
 
-                full_response += response.choices[0].delta.get("content", "")
+                if response.choices and len(response.choices) > 0:
+                    full_response += response.choices[0].delta.get("content", "")
                 message_placeholder.markdown(full_response + "▌")
             message_placeholder.markdown(full_response)
         st.session_state.messages.append({"role": "assistant", "content": full_response})
