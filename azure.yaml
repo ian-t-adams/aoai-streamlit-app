@@ -1,8 +1,0 @@
-# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
-
-name: AOAI_Streamlit_App
-services:
-  aoai-streamlit-app:
-    project: ../aoai-streamlit-app
-    language: py
-    host: appservice
