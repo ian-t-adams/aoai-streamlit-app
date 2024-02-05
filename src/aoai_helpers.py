@@ -1,16 +1,17 @@
 import os
 import time
-import openai
 import tiktoken
 import streamlit as st
+from openai import AzureOpenAI
 
-def generate_chat_completion(engine, messages, temperature, max_tokens, top_p, frequency_penalty, presence_penalty, stop, stream):
+
+def generate_chat_completion(client, engine, messages, temperature, max_tokens, top_p, frequency_penalty, presence_penalty, stop, stream):
     '''
     Generates a chat completion based on the provided messages.
     '''
     try:
-        response = openai.ChatCompletion.create(
-            engine=engine,
+        response = client.chat.completions.create(
+            model=engine,
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
@@ -21,7 +22,7 @@ def generate_chat_completion(engine, messages, temperature, max_tokens, top_p, f
             stream=stream
         )
         return response
-    except openai.error.RateLimitError as e:
+    except AzureOpenAI.error.RateLimitError as e:
         raise e
 
 def translate_engine_to_model(engine):
@@ -115,8 +116,7 @@ def load_settings(reload_api_settings=True):
     # only loaded if reload_api_settings = True
     if reload_api_settings:
         # Load in the API settings if requested
-        env_to_st_session_state('AOAI_API_TYPE', 'apitype', 'azure')
-        env_to_st_session_state('AOAI_API_VERSION', 'apiversion', '2023-05-15')
+        env_to_st_session_state('AOAI_API_VERSION', 'apiversion', '2023-12-01-preview')
         env_to_st_session_state('APIM_KEY', 'apikey', '')
         env_to_st_session_state('APIM_ENDPOINT', 'apiendpoint', '')
 
@@ -124,10 +124,10 @@ def toggle_settings():
     st.session_state['show_settings'] = not st.session_state['show_settings']
 
 def save_session_state():
-    st.session_state.apitype = st.session_state.apitype 
     st.session_state.apiversion = st.session_state.apiversion 
     st.session_state.apikey = st.session_state.apikey 
     st.session_state.apiendpoint = st.session_state.apiendpoint
+    st.session_state.client = st.session_state.client
     st.session_state.engine = st.session_state.modelkey
     st.session_state.temperature = st.session_state.tempkey 
     st.session_state.maxtokens = st.session_state.tokenskey 
@@ -358,3 +358,23 @@ model_params = {
         },  
     # Add more models here...  
     }
+
+# def old_generate_chat_completion(engine, messages, temperature, max_tokens, top_p, frequency_penalty, presence_penalty, stop, stream):
+#     '''
+#     Generates a chat completion based on the provided messages.
+#     '''
+#     try:
+#         response = openai.ChatCompletion.create(
+#             engine=engine,
+#             messages=messages,
+#             temperature=temperature,
+#             max_tokens=max_tokens,
+#             top_p=top_p,
+#             frequency_penalty=frequency_penalty,
+#             presence_penalty=presence_penalty,
+#             stop=stop,
+#             stream=stream
+#         )
+#         return response
+#     except openai.error.RateLimitError as e:
+#         raise e
