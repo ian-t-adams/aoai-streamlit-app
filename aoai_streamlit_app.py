@@ -3,17 +3,22 @@ Using the https://github.com/kirkhofer/data-ai/blob/main/aoai/chatbot.py repo fr
 '''
 
 import os
-import openai
 import streamlit as st
 from dotenv import load_dotenv  
+from openai import AzureOpenAI
 from src import aoai_helpers as helpers
 
 load_dotenv()  
 
-openai.api_type = "azure"  
-openai.api_key = os.environ['APIM_KEY']  
-openai.api_base = os.environ['APIM_ENDPOINT']  
-openai.api_version = os.environ['AOAI_API_VERSION']
+apim_key = os.environ['APIM_KEY']  
+apim_endpoint = os.environ['APIM_ENDPOINT']  
+version_of_api = os.environ['AOAI_API_VERSION']
+
+client = AzureOpenAI(
+  azure_endpoint=apim_endpoint, 
+  api_key=apim_key,  
+  api_version=version_of_api
+)
 
 # Preload environment variables and sidebar settings
 helpers.load_settings(reload_api_settings=True)
@@ -29,6 +34,10 @@ standard_system_message = "You are an AI assistant that helps people."
 with header_container:
     st.title("Interact with an Azure OpenAI 🤖", anchor="top", help='''This demo showcases the Azure OpenAI Service, Azure API Management Service,
           and Azure Web Apps with Streamlit.''')
+
+# Initialize the client in the st.session_state
+if 'client' not in st.session_state:
+    st.session_state.client = client
 
 # Pull up the messages if they exist - needed
 if 'messages' not in st.session_state:
@@ -159,11 +168,12 @@ with chat_container:
             message_placeholder = st.empty()
             full_response = ""
 
-            for response in helpers.generate_chat_completion(engine=st.session_state.engine,
-                                                            messages=[
+            for response in helpers.generate_chat_completion(client=st.session_state.client,
+                                                             engine=st.session_state.engine,
+                                                             messages=[
                                                                 {"role": m["role"], "content": m["content"]}
                                                                 for m in st.session_state.messages
-                                                            ],
+                                                                ],
                                                             temperature=st.session_state.temperature,
                                                             max_tokens=st.session_state.maxtokens,
                                                             top_p=st.session_state.topp,
@@ -173,7 +183,7 @@ with chat_container:
                                                             stream=True):
 
                 if response.choices and len(response.choices) > 0:
-                    full_response += response.choices[0].delta.get("content", "")
+                    full_response += response.choices[0].delta.content or ""
                 message_placeholder.markdown(full_response + "▌")
             message_placeholder.markdown(full_response)
         st.session_state.messages.append({"role": "assistant", "content": full_response})
