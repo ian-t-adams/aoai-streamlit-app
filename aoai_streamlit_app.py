@@ -7,6 +7,7 @@ import streamlit as st
 from dotenv import load_dotenv  
 from openai import AzureOpenAI
 from src import aoai_helpers as helpers
+from src import aoai_model_configs as model_configs
 
 load_dotenv()  
 
@@ -60,8 +61,8 @@ with st.sidebar.title("Model Parameters", anchor="top", help='''The model parame
                      "gpt-35-turbo-16k",
                      "gpt-4",
                      "gpt-4-32k",
-                     "gpt-4-turbo"], # ["gpt-4", "gpt-4-32k", "gpt-35-turbo", "gpt-35-turbo-16k"], 
-            #"Completion": ["text-davinci-003", "gpt-35-turbo-instruct"],  
+                     "gpt-4-turbo"], 
+            #"Completion": ["gpt-35-turbo-instruct"],  
             #"Embedding": ["text-embedding-ada-002"]  
         }
 
@@ -69,6 +70,7 @@ with st.sidebar.title("Model Parameters", anchor="top", help='''The model parame
         model_options = available_models["Chat"]
 
         # Set a default value for the model
+        
         default_index = model_options.index("gpt-35-turbo-16k")
 
         # model_options
@@ -79,9 +81,9 @@ with st.sidebar.title("Model Parameters", anchor="top", help='''The model parame
 
         # Then, when a model is selected, load the parameters for that model
         if model is not None:
-            params = helpers.model_params[model]
+            params = model_configs.model_params[model]
         else:
-            params = helpers.model_params["gpt-35-turbo-16k"]
+            params = model_configs.model_params["gpt-35-turbo-16k"]
         
         # Create a system message box so users may supply their own system message
         system_message = st.sidebar.text_area("System Message",
@@ -191,30 +193,3 @@ with chat_container:
 with footer_container:
     st.caption(f":red[______________________________________________________________________________________________]")
     st.caption(f":red[NOTE: ALL SYSTEM MESSAGES, PROMPTS, AND COMPLETIONS ARE LOGGED FOR THIS DEMO. DO NOT ENTER ANY SENSITIVE INFORMATION.]")
-
-# # Path: aoai-streamlit-app\src\aoai_streamlit_app.py
-
-# ###UPDATE 07/16/2023 - Add in ability to pass parameters for apim endpoint, key, and aoai_version
-# '''
-# import argparse
-# import os
-# import streamlit as st
-
-# # Define the command line arguments
-# parser = argparse.ArgumentParser()
-# parser.add_argument('--apim-endpoint', type=str, required=True, help='The Azure OpenAI API Management endpoint')
-# parser.add_argument('--apim-key', type=str, required=True, help='The Azure OpenAI API Management key')
-# args = parser.parse_args()
-
-# # Set the environment variables
-# os.environ['APIM_ENDPOINT'] = args.apim_endpoint
-# os.environ['APIM_KEY'] = args.apim_key
-
-# # Define the Streamlit app
-# def main():
-#     # Your Streamlit app code here
-#     pass
-
-# if __name__ == '__main__':
-#     main()
-# '''
