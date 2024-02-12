@@ -1,9 +1,15 @@
 import os
 import time
 import tiktoken
+import requests
 import streamlit as st
+from datetime import datetime
+from IPython.display import HTML
 from openai import AzureOpenAI
 
+# ############################################################
+# Azure OpenAI helper functions
+# ############################################################
 def generate_chat_completion(client, engine, messages, temperature, max_tokens, top_p, frequency_penalty, presence_penalty, stop, stream):
     '''
     Generates a chat completion based on the provided messages.
@@ -24,6 +30,119 @@ def generate_chat_completion(client, engine, messages, temperature, max_tokens, 
     except AzureOpenAI.error.RateLimitError as e:
         raise e
 
+# Bing Search helper function
+def get_web_search_results(query: str, bing_subscription_key: str, bing_search_url: str, answer_count: int = None, country_code: str = None, result_count: int = 50, result_freshness: str = None, market: str = "en-US", page_offset: int = None, promote_result_type: list[str] = None, response_filter: list[str] = None, safe_search: str = "Off", set_language: str = None, text_decorations: bool = True, text_format: str = "HTML"):
+    """
+    Executes a web search using the Bing Web Search API v7 and returns the results in an HTML table format.
+
+    This function sends a request to the Bing Web Search API with the provided query and other optional search parameters.
+    It then processes the API response and formats the search results as an HTML table with headers for URL, Snippet, 
+    Date Published, and Result Freshness. If no results are found or an error occurs, an appropriate message is returned.
+
+    Args:
+        query (str): The user's search query string.
+        bing_subscription_key (str): The subscription key for accessing the Bing Web Search API.
+        bing_search_url (str): The URL endpoint for the Bing Web Search API.
+        answer_count (int, optional): The number of answers that you want the search API to return.
+        country_code (str, optional): A 2-character country code of the country where the results come from.
+        result_count (int, optional): The number of search results to return in the response.
+        result_freshness (str, optional): Filter search results based on age. Possible values are "Day", "Week", "Month".
+        market (str, optional): The market where the results come from. Typically, mkt is the country where the user is making the request from.
+        page_offset (int, optional): The number of search results to skip before returning results.
+        promote_result_type (list[str], optional): A list of answer types to promote at the top of the search results.
+        response_filter (list[str], optional): A comma-delimited list of answer types to return in the search results.
+        safe_search (str, optional): A filter used to filter webpages for adult content. Possible values are "Off", "Moderate", "Strict".
+        set_language (str, optional): The language to use for user interface strings.
+        text_decorations (bool, optional): A Boolean value that determines whether display strings contain decoration markers such as hit highlighting characters.
+        text_format (str, optional): The format of the response. Possible values are "Raw", "HTML".
+
+    Returns:
+        IPython.core.display.HTML: An HTML object that contains a table of the search results. Each row of the table represents a single search result, including the URL, a snippet, the date published, and the result freshness.
+
+    Raises:
+        Exception: If there is an issue with the API request or processing the response, an exception is printed and returned.
+
+    Example:
+        >>> html_results = get_web_search_results(
+                query="Python programming",
+                bing_subscription_key="YOUR_SUBSCRIPTION_KEY",
+                bing_search_url="https://api.cognitive.microsoft.com/bing/v7.0/search",
+                result_count=10,
+                market="en-US",
+                safe_search="Strict"
+            )
+        >>> display(html_results)
+
+    Note:
+        To use this function, you must have a valid Bing Web Search API subscription key.
+        Ensure that you are complying with the Bing Web Search API terms of use.
+    """
+    try:
+        # Create the header object with the subscription key
+        headers = {"Ocp-Apim-Subscription-Key": bing_subscription_key}
+        # Create a dictionary of the required and optional parameters for the API request
+        # Start with the required query parameter
+        params = {"q": query}  # Start with the required query parameter
+
+        # Add optional parameters to the params dictionary if they are not None
+        if answer_count is not None:
+            params["answerCount"] = answer_count
+        if country_code is not None:
+            params["cc"] = country_code
+        if result_count is not None:
+            params["count"] = result_count
+        if result_freshness is not None:
+            params["freshness"] = result_freshness
+        if market is not None:
+            params["mkt"] = market
+        if page_offset is not None:
+            params["offset"] = page_offset
+        if promote_result_type is not None:
+            params["promote"] = promote_result_type
+        if response_filter is not None:
+            params["responseFilter"] = response_filter
+        if safe_search is not None:
+            params["safeSearch"] = safe_search
+        if set_language is not None:
+            params["setLang"] = set_language
+        if text_decorations is not None:
+            params["textDecorations"] = text_decorations
+        if text_format is not None:
+            params["textFormat"] = text_format
+
+        # Send the request to the Bing Web Search API
+        response = requests.get(bing_search_url, headers=headers, params=params)
+        response.raise_for_status()
+        search_results = response.json()
+
+        # Format the search results as an HTML table
+        header = "<tr><th>URL</th><th>Snippet</th><th>Date Published</th><th>Result Freshness</th></tr>"
+        # Extract the search results and format them as rows of an HTML table
+        if 'webPages' in search_results and 'value' in search_results['webPages']:
+            rows = "\n".join([f"""<tr>
+                                  <td><a href=\"{v.get("url", "URL not available")}\">{v.get("name", "Name not available")}</a></td>
+                                  <td>{v.get("snippet", "Snippet not available")}</td>
+                                  <td>{datetime.strptime(v.get("datePublished", "0001-01-01T00:00:00Z")[:-1], '%Y-%m-%dT%H:%M:%S.%f').strftime('%Y-%m-%d') if v.get("datePublished") else "Date not available"}</td>
+                                  <td>{v.get("datePublishedFreshnessText", "Not available")}</td>
+                              </tr>"""
+                        for v in search_results["webPages"]["value"]])
+        else:
+            rows = "No results found."
+        
+        # Prepend the header to the rows
+        rows = header + rows
+
+        # Retun the table with HTML mark-up
+        html_table = HTML("<table>{0}</table>".format(rows))
+        return html_table
+
+    except Exception as e:
+        print("An error occurred during the web search.")
+        return e
+
+# ############################################################
+# Tiktoken helper functions
+# ############################################################
 def translate_engine_to_model(engine):
     '''
     Translates the engine name to the model name for use with 
@@ -91,6 +210,9 @@ def num_tokens_from_messages(messages, model):
     num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
     return num_tokens
 
+# ############################################################
+# Streamlit session state helper functions
+# ############################################################
 def env_to_st_session_state(setting_name, session_name, default_value):  
     """  
     Function to generate st.session_state variables from environment variables.  

@@ -1,6 +1,3 @@
-'''
-Using the https://github.com/kirkhofer/data-ai/blob/main/aoai/chatbot.py repo from Kirk Hofer as a starting point.
-'''
 
 import os
 import streamlit as st
