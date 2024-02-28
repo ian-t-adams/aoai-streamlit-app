@@ -26,24 +26,27 @@ def generate_chat_completion(client, engine, messages, temperature, max_tokens, 
         raise e
 
 # Bing Search helper function
-def bing_web_search(api_key, query: str, output_format: str ='markdown', **kwargs) -> str:
+def bing_web_search(api_key, query: str, output_format: str ='html', **kwargs) -> str:
     """
-    Perform a search using the Bing Web Search v7.0 API with error handling and support for various query parameters.
-    Outputs in either Markdown or HTML table format, including additional details about the search results.
+    Perform a search using the Bing Web Search v7.0 API with error handling, support for various query parameters and
+    advanced search keywords in the query. Outputs a string that can be displayed in either Markdown or HTML table format
+    and including additional details about the search results.
 
     Args:
         api_key (str): The API key for accessing the Bing Web Search API.
         query (str): The user's search query term. Must not be empty.
-        output_format (str): The format of the output, either 'markdown' or 'html'. Default is 'markdown'.
+        output_format (str): The format of the output, either 'markdown' or 'html'. Default is 'html'.
         **kwargs: Arbitrary keyword arguments representing additional query parameters supported by the API.
+        advanced key words found here: https://support.microsoft.com/en-us/topic/advanced-search-keywords-ea595928-5d63-4a0b-9c6b-0b769865e78a
 
     Returns:
         str: A table with the search results in the specified format or an error message, including additional details.
 
     Example:
         >>> api_key = 'YOUR_BING_API_KEY'
-        >>> query = 'Python programming'
-        >>> print(bing_web_search(api_key, query, output_format='html', count=5, mkt='en-US'))
+        >>> query = 'How do I use tools and function calling? site:https://learn.microsoft.com/'
+        >>> output = bing_web_search(api_key, query, output_format='html', count=50, mkt='en-US')
+        >>> display(HTML(output))
     """  
     base_url = "https://api.bing.microsoft.com/v7.0/search"  
     headers = {"Ocp-Apim-Subscription-Key": api_key}  
