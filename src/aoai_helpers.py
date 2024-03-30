@@ -1,10 +1,10 @@
-import os
-import time
-import tiktoken
+import os, requests, html, tiktoken
 import streamlit as st
 from openai import AzureOpenAI
 
-
+# ############################################################
+# Azure OpenAI helper functions
+# ############################################################
 def generate_chat_completion(client, engine, messages, temperature, max_tokens, top_p, frequency_penalty, presence_penalty, stop, stream):
     '''
     Generates a chat completion based on the provided messages.
@@ -25,6 +25,85 @@ def generate_chat_completion(client, engine, messages, temperature, max_tokens, 
     except AzureOpenAI.error.RateLimitError as e:
         raise e
 
+# Bing Search helper function
+def bing_web_search(api_key, query: str, output_format: str ='html', **kwargs) -> str:
+    """
+    Perform a search using the Bing Web Search v7.0 API with error handling, support for various query parameters and
+    advanced search keywords in the query. Outputs a string that can be displayed in either Markdown or HTML table format
+    and including additional details about the search results.
+
+    Args:
+        api_key (str): The API key for accessing the Bing Web Search API.
+        query (str): The user's search query term. Must not be empty.
+        output_format (str): The format of the output, either 'markdown' or 'html'. Default is 'html'.
+        **kwargs: Arbitrary keyword arguments representing additional query parameters supported by the API.
+        advanced key words found here: https://support.microsoft.com/en-us/topic/advanced-search-keywords-ea595928-5d63-4a0b-9c6b-0b769865e78a
+
+    Returns:
+        str: A table with the search results in the specified format or an error message, including additional details.
+
+    Example:
+        >>> api_key = 'YOUR_BING_API_KEY'
+        >>> query = 'How do I use tools and function calling? site:https://learn.microsoft.com/'
+        >>> output = bing_web_search(api_key, query, output_format='html', count=50, mkt='en-US')
+        >>> display(HTML(output))
+    """  
+    base_url = "https://api.bing.microsoft.com/v7.0/search"  
+    headers = {"Ocp-Apim-Subscription-Key": api_key}  
+    params = {"q": query}  
+    params.update(kwargs)  
+  
+    try:  
+        response = requests.get(base_url, headers=headers, params=params)  
+        response.raise_for_status()  
+    except requests.exceptions.HTTPError as err:  
+        return f"HTTP Error: {err}"  
+    except requests.exceptions.RequestException as e:  
+        return f"Error: {e}"  
+  
+    results = response.json()  
+  
+    if 'webPages' not in results:  
+        return "No results found or the query was invalid."  
+  
+    if output_format == 'markdown':  
+        table = "Name (URL) | Snippet | Last Updated | Type\n"  
+        table += "--- | --- | --- | ---\n"  
+    elif output_format == 'html':  
+        table = "<table><tr><th>Name (URL)</th><th>Snippet</th><th>Last Updated</th><th>Type</th></tr>"  
+  
+    for item in results.get("webPages", {}).get("value", []):  
+        name = html.escape(item.get("name", "N/A"))  
+        url = item.get("url", "N/A")  
+        snippet = item.get("snippet", "N/A").replace("\n", " ")  
+        last_updated = item.get("dateLastCrawled", "N/A")[:10]  # Extract just the date  
+        result_type = "Web page"  # In this context, all results are web pages  
+          
+        # Handle snippet highlighting  
+        if output_format == 'html':  
+            snippet = html.escape(snippet, quote=False)  
+        else:  # For Markdown, convert highlight tags from HTML to Markdown if present  
+            snippet = snippet.replace('<strong>', '**').replace('</strong>', '**')  
+          
+        # Format the name and URL as a clickable link  
+        if output_format == 'html':  
+            link = f"<a href='{url}'>{name}</a>"  
+        else:  # Markdown  
+            link = f"[{name}]({url})"  
+          
+        # Build the table row  
+        if output_format == 'markdown':  
+            table += f"{link} | {snippet} | {last_updated} | {result_type}\n"  
+        elif output_format == 'html':  
+            table += f"<tr><td>{link}</td><td>{snippet}</td><td>{last_updated}</td><td>{result_type}</td></tr>"  
+  
+    table += "</table>" if output_format == 'html' else ""  
+  
+    return table
+
+# ############################################################
+# Tiktoken helper functions
+# ############################################################
 def translate_engine_to_model(engine):
     '''
     Translates the engine name to the model name for use with 
@@ -92,6 +171,9 @@ def num_tokens_from_messages(messages, model):
     num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
     return num_tokens
 
+# ############################################################
+# Streamlit session state helper functions
+# ############################################################
 def env_to_st_session_state(setting_name, session_name, default_value):  
     """  
     Function to generate st.session_state variables from environment variables.  
@@ -102,279 +184,48 @@ def env_to_st_session_state(setting_name, session_name, default_value):
         else:
             st.session_state[session_name] = default_value
 
-def load_settings(reload_api_settings=True):
-    # These set the default values for the sidebar optoins and are used in aoai_streamlit_app.py
-    # This is what values return to when reset is clicked
-    env_to_st_session_state('ST_ENGINE', 'engine', 'gpt-35-turbo-16k')
-    env_to_st_session_state('ST_TEMPERATURE', 'temperature', 0.5)
-    env_to_st_session_state('ST_MAX_TOKENS', 'maxtokens', 4000)
-    env_to_st_session_state('ST_TOP_P', 'topp', 0.90)
-    env_to_st_session_state('ST_FREQUENCY_PENALTY', 'frequencypenalty', 0.0)
-    env_to_st_session_state('ST_PRESENCE_PENALTY', 'presencepenalty', 0.0)
-
-    # These are the default values for the API settings
-    # only loaded if reload_api_settings = True
-    if reload_api_settings:
-        # Load in the API settings if requested
-        env_to_st_session_state('AOAI_API_VERSION', 'apiversion', '2023-12-01-preview')
-        env_to_st_session_state('APIM_KEY', 'apikey', '')
-        env_to_st_session_state('APIM_ENDPOINT', 'apiendpoint', '')
+def load_settings(reload_api_settings=True):  
+    """  
+    Loads settings for the sidebar options, API configurations, and model parameters.  
+    Ensures that default values are used only if session state variables are not already set.  
+    """  
+    # Model parameters initialization  
+    model_parameters = {  
+        'temperature': 0.7,  
+        'maxtokens': 4000,  
+        'topp': 0.90,  
+        'frequencypenalty': 0.0,  
+        'presencepenalty': 0.0,  
+        'engine': 'gpt-35-turbo-16k',  # Default model  
+        'system': 'You are an AI assistant that helps people.'  
+    }  
+    for param, default_value in model_parameters.items():  
+        if param not in st.session_state:  
+            st.session_state[param] = default_value  
+  
+    # API settings initialization (only if reload_api_settings is True)  
+    if reload_api_settings:  
+        api_settings = {  
+            'apiversion': '2023-12-01-preview',  
+            'apikey': '',  
+            'apiendpoint': ''  
+        }  
+        for setting, default_value in api_settings.items():  
+            env_to_st_session_state(setting.upper(), setting, default_value)  
 
 def toggle_settings():
     st.session_state['show_settings'] = not st.session_state['show_settings']
 
-def save_session_state():
-    st.session_state.apiversion = st.session_state.apiversion 
-    st.session_state.apikey = st.session_state.apikey 
-    st.session_state.apiendpoint = st.session_state.apiendpoint
-    st.session_state.client = st.session_state.client
-    st.session_state.engine = st.session_state.modelkey
-    st.session_state.temperature = st.session_state.tempkey 
-    st.session_state.maxtokens = st.session_state.tokenskey 
-    st.session_state.topp = st.session_state.top_pkey 
-    st.session_state.frequencypenalty = st.session_state.frequency_penaltykey
-    st.session_state.presencepenalty = st.session_state.presence_penaltykey
-    st.session_state.system = st.session_state.txtSystem 
-    st.session_state.messages[0]['content'] = st.session_state.system
-
-# Define a dictionary for  use with st.sidebar when loaded into aoai_streamlit_app.py
-model_params = {  
-    "gpt-35-turbo-0301": {
-        "tokens_min": 10,
-        "tokens_max": 4000,
-        "tokens_step": 10,
-        "tokens_help": '''Set a limit on the number of tokens per model response. 
-        The API supports a maximum of 4000 tokens shared between the prompt (including system message, examples, message history, and user query) and the model's response. 
-        One token is roughly 4 characters for typical English text.''',
-        "temp_min": 0.00,
-        "temp_max": 2.00,
-        "temp_step": 0.01,
-        "temp_help": '''Controls randomness. Lowering the temperature means that the model will produce more repetitive and deterministic responses.
-         Increasing the temperature will result in more unexpected or creative responses. Try adjusting temperature or Top P but not both.''',
-        "top_p_min": 0.00,
-        "top_p_max": 1.00,
-        "top_p_step": 0.01,
-        "top_p_help": '''Similar to temperature, this controls randomness but uses a different method, called nucleus sampling where
-        the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 
-        10% probability mass are considered. Lowering Top P will narrow the model’s token selection to likelier tokens. 
-        Increasing Top P will let the model choose from tokens with both high and low likelihood. 
-        Try adjusting temperature or Top P but not both.''',
-        "frequency_penalty_min": -2.00,
-        "frequency_penalty_max": 2.00,
-        "frequency_penalty_step": 0.01,
-        "frequency_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating a token proportionally based on how often it has appeared in the text so far. 
-        This decreases the likelihood of repeating the exact same text in a response..''',
-        "presence_penalty_min": -2.00,
-        "presence_penalty_max": 2.00,
-        "presence_penalty_step": 0.01,
-        "presence_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating any token that has appeared in the text at all so far. 
-        This increases the likelihood of introducing new topics in a response.''',
-        },
-    "gpt-35-turbo-0613": {
-        "tokens_min": 10,
-        "tokens_max": 4000,
-        "tokens_step": 10,
-        "tokens_help": '''Set a limit on the number of tokens per model response. 
-        The API supports a maximum of 4000 tokens shared between the prompt (including system message, examples, message history, and user query) and the model's response. 
-        One token is roughly 4 characters for typical English text.''',
-        "temp_min": 0.00,
-        "temp_max": 2.00,
-        "temp_step": 0.01,
-        "temp_help": '''Controls randomness. Lowering the temperature means that the model will produce more repetitive and deterministic responses.
-         Increasing the temperature will result in more unexpected or creative responses. Try adjusting temperature or Top P but not both.''',
-        "top_p_min": 0.00,
-        "top_p_max": 1.00,
-        "top_p_step": 0.01,
-        "top_p_help": '''Similar to temperature, this controls randomness but uses a different method, called nucleus sampling where
-        the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 
-        10% probability mass are considered. Lowering Top P will narrow the model’s token selection to likelier tokens. 
-        Increasing Top P will let the model choose from tokens with both high and low likelihood. 
-        Try adjusting temperature or Top P but not both.''',
-        "frequency_penalty_min": -2.00,
-        "frequency_penalty_max": 2.00,
-        "frequency_penalty_step": 0.01,
-        "frequency_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating a token proportionally based on how often it has appeared in the text so far. 
-        This decreases the likelihood of repeating the exact same text in a response..''',
-        "presence_penalty_min": -2.00,
-        "presence_penalty_max": 2.00,
-        "presence_penalty_step": 0.01,
-        "presence_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating any token that has appeared in the text at all so far. 
-        This increases the likelihood of introducing new topics in a response.''',
-        },
-    "gpt-35-turbo-1106": {
-        "tokens_min": 10,
-        "tokens_max": 16000,
-        "tokens_step": 10,
-        "tokens_help": '''Set a limit on the number of tokens per model response. 
-        The API supports a maximum of 4000 tokens shared between the prompt (including system message, examples, message history, and user query) and the model's response. 
-        One token is roughly 4 characters for typical English text.''',
-        "temp_min": 0.00,
-        "temp_max": 2.00,
-        "temp_step": 0.01,
-        "temp_help": '''Controls randomness. Lowering the temperature means that the model will produce more repetitive and deterministic responses.
-         Increasing the temperature will result in more unexpected or creative responses. Try adjusting temperature or Top P but not both.''',
-        "top_p_min": 0.00,
-        "top_p_max": 1.00,
-        "top_p_step": 0.01,
-        "top_p_help": '''Similar to temperature, this controls randomness but uses a different method, called nucleus sampling where
-        the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 
-        10% probability mass are considered. Lowering Top P will narrow the model’s token selection to likelier tokens. 
-        Increasing Top P will let the model choose from tokens with both high and low likelihood. 
-        Try adjusting temperature or Top P but not both.''',
-        "frequency_penalty_min": -2.00,
-        "frequency_penalty_max": 2.00,
-        "frequency_penalty_step": 0.01,
-        "frequency_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating a token proportionally based on how often it has appeared in the text so far. 
-        This decreases the likelihood of repeating the exact same text in a response..''',
-        "presence_penalty_min": -2.00,
-        "presence_penalty_max": 2.00,
-        "presence_penalty_step": 0.01,
-        "presence_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating any token that has appeared in the text at all so far. 
-        This increases the likelihood of introducing new topics in a response.''',
-        },
-    "gpt-35-turbo-16k": {
-        "tokens_min": 10,
-        "tokens_max": 16000,
-        "tokens_step": 10,
-        "tokens_help": '''Set a limit on the number of tokens per model response. 
-        The API supports a maximum of 16,000 tokens shared between the prompt (including system message, examples, message history, and user query) and the model's response. 
-        One token is roughly 4 characters for typical English text.''',
-        "temp_min": 0.00,
-        "temp_max": 2.00,
-        "temp_step": 0.01,
-        "temp_help": '''Controls randomness. Lowering the temperature means that the model will produce more repetitive and deterministic responses.
-         Increasing the temperature will result in more unexpected or creative responses. Try adjusting temperature or Top P but not both.''',
-        "top_p_min": 0.00,
-        "top_p_max": 1.00,
-        "top_p_step": 0.01,
-        "top_p_help": '''Similar to temperature, this controls randomness but uses a different method, called nucleus sampling where
-        the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 
-        10% probability mass are considered. Lowering Top P will narrow the model’s token selection to likelier tokens. 
-        Increasing Top P will let the model choose from tokens with both high and low likelihood. 
-        Try adjusting temperature or Top P but not both.''',
-        "frequency_penalty_min": -2.00,
-        "frequency_penalty_max": 2.00,
-        "frequency_penalty_step": 0.01,
-        "frequency_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating a token proportionally based on how often it has appeared in the text so far. 
-        This decreases the likelihood of repeating the exact same text in a response..''',
-        "presence_penalty_min": -2.00,
-        "presence_penalty_max": 2.00,
-        "presence_penalty_step": 0.01,
-        "presence_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating any token that has appeared in the text at all so far. 
-        This increases the likelihood of introducing new topics in a response.''',
-        },
-    "gpt-4": {
-        "tokens_min": 10,
-        "tokens_max": 8192,
-        "tokens_step": 10,
-        "tokens_help": '''Set a limit on the number of tokens per model response. 
-        The API supports a maximum of 8,192 tokens shared between the prompt (including system message, examples, message history, and user query) and the model's response. 
-        One token is roughly 4 characters for typical English text.''',
-        "temp_min": 0.00,
-        "temp_max": 2.00,
-        "temp_step": 0.01,
-        "temp_help": '''Controls randomness. Lowering the temperature means that the model will produce more repetitive and deterministic responses.
-         Increasing the temperature will result in more unexpected or creative responses. Try adjusting temperature or Top P but not both.''',
-        "top_p_min": 0.00,
-        "top_p_max": 1.00,
-        "top_p_step": 0.01,
-        "top_p_help": '''Similar to temperature, this controls randomness but uses a different method, called nucleus sampling where
-        the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 
-        10% probability mass are considered. Lowering Top P will narrow the model’s token selection to likelier tokens. 
-        Increasing Top P will let the model choose from tokens with both high and low likelihood. 
-        Try adjusting temperature or Top P but not both.''',
-        "frequency_penalty_min": -2.00,
-        "frequency_penalty_max": 2.00,
-        "frequency_penalty_step": 0.01,
-        "frequency_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating a token proportionally based on how often it has appeared in the text so far. 
-        This decreases the likelihood of repeating the exact same text in a response..''',
-        "presence_penalty_min": -2.00,
-        "presence_penalty_max": 2.00,
-        "presence_penalty_step": 0.01,
-        "presence_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating any token that has appeared in the text at all so far. 
-        This increases the likelihood of introducing new topics in a response.''',
-        },
-    "gpt-4-32k": {
-        "tokens_min": 10,
-        "tokens_max": 32768,
-        "tokens_step": 10,
-        "tokens_help": '''Set a limit on the number of tokens per model response. 
-        The API supports a maximum of 32,768 tokens shared between the prompt (including system message, examples, message history, and user query) and the model's response. 
-        One token is roughly 4 characters for typical English text.''',
-        "temp_min": 0.00,
-        "temp_max": 2.00,
-        "temp_step": 0.01,
-        "temp_help": '''Controls randomness. Lowering the temperature means that the model will produce more repetitive and deterministic responses.
-         Increasing the temperature will result in more unexpected or creative responses. Try adjusting temperature or Top P but not both.''',
-        "top_p_min": 0.00,
-        "top_p_max": 1.00,
-        "top_p_step": 0.01,
-        "top_p_help": '''Similar to temperature, this controls randomness but uses a different method, called nucleus sampling where
-        the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 
-        10% probability mass are considered. Lowering Top P will narrow the model’s token selection to likelier tokens. 
-        Increasing Top P will let the model choose from tokens with both high and low likelihood. 
-        Try adjusting temperature or Top P but not both.''',
-        "frequency_penalty_min": -2.00,
-        "frequency_penalty_max": 2.00,
-        "frequency_penalty_step": 0.01,
-        "frequency_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating a token proportionally based on how often it has appeared in the text so far. 
-        This decreases the likelihood of repeating the exact same text in a response..''',
-        "presence_penalty_min": -2.00,
-        "presence_penalty_max": 2.00,
-        "presence_penalty_step": 0.01,
-        "presence_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating any token that has appeared in the text at all so far. 
-        This increases the likelihood of introducing new topics in a response.''',
-        },
-    "gpt-4-turbo": {
-        "tokens_min": 10,
-        "tokens_max": 4096,
-        "tokens_step": 10,
-        "tokens_help": '''Set a limit on the number of tokens per model response. 
-        The API supports a maximum of 4,096 tokens for it's output. HOWEVER, it has a 128,000 token context window, so large amounts of text may be submitted but it will
-        still be limited to the 4,096 max token output in a single response. You can ask it to continue to keep providing output if it cuts off mid-sentence.''',
-        "temp_min": 0.00,
-        "temp_max": 2.00,
-        "temp_step": 0.01,
-        "temp_help": '''Controls randomness. Lowering the temperature means that the model will produce more repetitive and deterministic responses.
-         Increasing the temperature will result in more unexpected or creative responses. Try adjusting temperature or Top P but not both.''',
-        "top_p_min": 0.00,
-        "top_p_max": 1.00,
-        "top_p_step": 0.01,
-        "top_p_help": '''Similar to temperature, this controls randomness but uses a different method, called nucleus sampling where
-        the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 
-        10% probability mass are considered. Lowering Top P will narrow the model’s token selection to likelier tokens. 
-        Increasing Top P will let the model choose from tokens with both high and low likelihood. 
-        Try adjusting temperature or Top P but not both.''',
-        "frequency_penalty_min": -2.00,
-        "frequency_penalty_max": 2.00,
-        "frequency_penalty_step": 0.01,
-        "frequency_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating a token proportionally based on how often it has appeared in the text so far. 
-        This decreases the likelihood of repeating the exact same text in a response..''',
-        "presence_penalty_min": -2.00,
-        "presence_penalty_max": 2.00,
-        "presence_penalty_step": 0.01,
-        "presence_penalty_help": '''Number between -2.0 and 2.0. Reduce the chance of repeating any token that has appeared in the text at all so far. 
-        This increases the likelihood of introducing new topics in a response.''',
-        },  
-    # Add more models here...  
-    }
-
-# def old_generate_chat_completion(engine, messages, temperature, max_tokens, top_p, frequency_penalty, presence_penalty, stop, stream):
-#     '''
-#     Generates a chat completion based on the provided messages.
-#     '''
-#     try:
-#         response = openai.ChatCompletion.create(
-#             engine=engine,
-#             messages=messages,
-#             temperature=temperature,
-#             max_tokens=max_tokens,
-#             top_p=top_p,
-#             frequency_penalty=frequency_penalty,
-#             presence_penalty=presence_penalty,
-#             stop=stop,
-#             stream=stream
-#         )
-#         return response
-#     except openai.error.RateLimitError as e:
-#         raise e
+def save_session_state():  
+    # Update this function to only save variables that are used and initialized within the app  
+    st.session_state.client = st.session_state.client  
+    st.session_state.engine = st.session_state.engine  
+    st.session_state.temperature = st.session_state.temperature  
+    st.session_state.max_tokens = st.session_state.max_tokens  
+    st.session_state.top_p = st.session_state.top_p  
+    st.session_state.frequency_penalty = st.session_state.frequency_penalty  
+    st.session_state.presence_penalty = st.session_state.presence_penalty  
+    st.session_state.system = st.session_state.system  
+    # Update the system message in the first message if it is of type 'system'  
+    if st.session_state.messages and st.session_state.messages[0]['role'] == 'system':  
+        st.session_state.messages[0]['content'] = st.session_state.system  
