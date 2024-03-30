@@ -164,8 +164,7 @@ with chat_container:
     
 with footer_container:    
     st.caption(f":red[______________________________________________________________________________________________]")    
-    st.caption(f":red[NOTE: ALL SYSTEM MESSAGES, PROMPTS, AND COMPLETIONS ARE LOGGED FOR THIS DEMO. DO NOT ENTER ANY SENSITIVE INFORMATION.]")    
-
+    st.caption(f":red[NOTE: ALL SYSTEM MESSAGES, PROMPTS, AND COMPLETIONS ARE LOGGED FOR THIS DEMO. DO NOT ENTER ANY SENSITIVE INFORMATION.]")
 ```
 
 2. aoai_helpers.py
@@ -283,24 +282,24 @@ def translate_engine_to_model(engine):
     '''
     try:
         engine_model_dict = {"gpt-35-turbo-0301" : "gpt-3.5-turbo",
-                             "gpt-35-turbo-0613" : "gpt-3.5-turbo",
-                             "gpt-35-turbo-1106" : "gpt-3.5-turbo",
-                             "gpt-35-turbo-16k" : "gpt-3.5-turbo-16k-0613",
-                             "gpt-4" : "gpt-4-0613",
-                             "gpt-4-32k" : "gpt-4-32k-0613",
-                             "gpt-4-turbo" : "gpt-4-32k-0613"}
+							 "gpt-35-turbo-0613" : "gpt-3.5-turbo",
+							 "gpt-35-turbo-1106" : "gpt-3.5-turbo",
+							 "gpt-35-turbo-16k" : "gpt-3.5-turbo-16k-0613",
+							 "gpt-4" : "gpt-4-0613",
+							 "gpt-4-32k" : "gpt-4-32k-0613",
+							 "gpt-4-turbo" : "gpt-4-32k-0613"}
         model = engine_model_dict.get(engine)
         if model is None:
             raise KeyError(f"Engine {engine} not found. Please use one of the following: {list(engine_model_dict.keys())}")
         return model
     except KeyError:
         engine_model_dict = {"gpt-35-turbo-0301" : "gpt-3.5-turbo",
-                             "gpt-35-turbo-0613" : "gpt-3.5-turbo",
-                             "gpt-35-turbo-1106" : "gpt-3.5-turbo",
-                             "gpt-35-turbo-16k" : "gpt-3.5-turbo-16k-0613",
-                             "gpt-4" : "gpt-4-0613",
-                             "gpt-4-32k" : "gpt-4-32k-0613",
-                             "gpt-4-turbo" : "gpt-4-32k-0613"}
+							 "gpt-35-turbo-0613" : "gpt-3.5-turbo",
+							 "gpt-35-turbo-1106" : "gpt-3.5-turbo",
+							 "gpt-35-turbo-16k" : "gpt-3.5-turbo-16k-0613",
+							 "gpt-4" : "gpt-4-0613",
+							 "gpt-4-32k" : "gpt-4-32k-0613",
+							 "gpt-4-turbo" : "gpt-4-32k-0613"}
         raise KeyError(f"Engine {engine} not found. Please use one of the following: {list(engine_model_dict.keys())}")
 
 def num_tokens_from_messages(messages, model):
@@ -400,7 +399,7 @@ def save_session_state():
     st.session_state.system = st.session_state.system  
     # Update the system message in the first message if it is of type 'system'  
     if st.session_state.messages and st.session_state.messages[0]['role'] == 'system':  
-        st.session_state.messages[0]['content'] = st.session_state.system  
+        st.session_state.messages[0]['content'] = st.session_state.system
 ```
 
 3. aoai_model_configs.json
