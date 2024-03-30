@@ -184,37 +184,48 @@ def env_to_st_session_state(setting_name, session_name, default_value):
         else:
             st.session_state[session_name] = default_value
 
-def load_settings(reload_api_settings=True):
-    # These set the default values for the sidebar optoins and are used in aoai_streamlit_app.py
-    # This is what values return to when reset is clicked
-    env_to_st_session_state('ST_ENGINE', 'engine', 'gpt-35-turbo-16k')
-    env_to_st_session_state('ST_TEMPERATURE', 'temperature', 0.5)
-    env_to_st_session_state('ST_MAX_TOKENS', 'maxtokens', 4000)
-    env_to_st_session_state('ST_TOP_P', 'topp', 0.90)
-    env_to_st_session_state('ST_FREQUENCY_PENALTY', 'frequencypenalty', 0.0)
-    env_to_st_session_state('ST_PRESENCE_PENALTY', 'presencepenalty', 0.0)
-
-    # These are the default values for the API settings
-    # only loaded if reload_api_settings = True
-    if reload_api_settings:
-        # Load in the API settings if requested
-        env_to_st_session_state('AOAI_API_VERSION', 'apiversion', '2023-12-01-preview')
-        env_to_st_session_state('APIM_KEY', 'apikey', '')
-        env_to_st_session_state('APIM_ENDPOINT', 'apiendpoint', '')
+def load_settings(reload_api_settings=True):  
+    """  
+    Loads settings for the sidebar options, API configurations, and model parameters.  
+    Ensures that default values are used only if session state variables are not already set.  
+    """  
+    # Model parameters initialization  
+    model_parameters = {  
+        'temperature': 0.7,  
+        'maxtokens': 4000,  
+        'topp': 0.90,  
+        'frequencypenalty': 0.0,  
+        'presencepenalty': 0.0,  
+        'engine': 'gpt-35-turbo-16k',  # Default model  
+        'system': 'You are an AI assistant that helps people.'  
+    }  
+    for param, default_value in model_parameters.items():  
+        if param not in st.session_state:  
+            st.session_state[param] = default_value  
+  
+    # API settings initialization (only if reload_api_settings is True)  
+    if reload_api_settings:  
+        api_settings = {  
+            'apiversion': '2023-12-01-preview',  
+            'apikey': '',  
+            'apiendpoint': ''  
+        }  
+        for setting, default_value in api_settings.items():  
+            env_to_st_session_state(setting.upper(), setting, default_value)  
 
 def toggle_settings():
     st.session_state['show_settings'] = not st.session_state['show_settings']
 
-def save_session_state():
-    st.session_state.apiversion = st.session_state.apiversion 
-    st.session_state.apikey = st.session_state.apikey 
-    st.session_state.apiendpoint = st.session_state.apiendpoint
-    st.session_state.client = st.session_state.client
-    st.session_state.engine = st.session_state.modelkey
-    st.session_state.temperature = st.session_state.tempkey 
-    st.session_state.maxtokens = st.session_state.tokenskey 
-    st.session_state.topp = st.session_state.top_pkey 
-    st.session_state.frequencypenalty = st.session_state.frequency_penaltykey
-    st.session_state.presencepenalty = st.session_state.presence_penaltykey
-    st.session_state.system = st.session_state.txtSystem 
-    st.session_state.messages[0]['content'] = st.session_state.system
+def save_session_state():  
+    # Update this function to only save variables that are used and initialized within the app  
+    st.session_state.client = st.session_state.client  
+    st.session_state.engine = st.session_state.engine  
+    st.session_state.temperature = st.session_state.temperature  
+    st.session_state.max_tokens = st.session_state.max_tokens  
+    st.session_state.top_p = st.session_state.top_p  
+    st.session_state.frequency_penalty = st.session_state.frequency_penalty  
+    st.session_state.presence_penalty = st.session_state.presence_penalty  
+    st.session_state.system = st.session_state.system  
+    # Update the system message in the first message if it is of type 'system'  
+    if st.session_state.messages and st.session_state.messages[0]['role'] == 'system':  
+        st.session_state.messages[0]['content'] = st.session_state.system  

@@ -1,0 +1,455 @@
+You are an AI assistant that helps people find information. You have 3 files that will be referenced by the user:
+1. aoai_streamlit_app.py
+2. aoai_helpers.py
+3. aoai_models_configs.json
+
+You will be asked to assist in changing, correcting, improving, or adding new features to these files to improve the aoai-streamlit-app project upon which you are employed. Please help the User as much as possible. Provide good documentation, including docstrings. Write clear, concise, human-readable code. And, always write the adjusted file out in full.
+
+1. aoai_streamlit_app.py
+```python
+import os    
+import streamlit as st    
+import json    
+from dotenv import load_dotenv      
+from openai import AzureOpenAI    
+from src import aoai_helpers as helpers    
+    
+load_dotenv()      
+    
+apim_key = os.environ['APIM_KEY']      
+apim_endpoint = os.environ['APIM_ENDPOINT']      
+version_of_api = os.environ['AOAI_API_VERSION']    
+    
+client = AzureOpenAI(    
+  azure_endpoint=apim_endpoint,     
+  api_key=apim_key,      
+  api_version=version_of_api    
+)    
+    
+# Create containers for the header, chat window, and footer - will use sidebar for setting model parameters    
+header_container = st.container()    
+chat_container = st.container()    
+footer_container = st.container()    
+settings_container = st.sidebar.container()    
+standard_system_message = "You are an AI assistant that helps people."    
+    
+# Top level title and description of the app    
+with header_container:    
+    st.title("Interact with an Azure OpenAI 🤖", anchor="top", help='''This demo showcases the Azure OpenAI Service, Azure API Management Service,    
+          and Azure Web Apps with Streamlit.''')    
+    
+# Initialize the client in the st.session_state    
+if 'client' not in st.session_state:    
+    st.session_state.client = client    
+    
+# Initialize 'engine' in session_state if not present  
+if 'engine' not in st.session_state:  
+    st.session_state.engine = 'gpt-35-turbo-16k'  # Default value  
+    
+# Pull up the messages if they exist - needed    
+if 'messages' not in st.session_state:    
+    helpers.env_to_st_session_state('SYSTEM','system', standard_system_message)    
+    st.session_state.messages = []    
+    st.session_state.messages.append({"role":"system","content":st.session_state.system})    
+    
+# Load model configurations from JSON    
+with open("configs/aoai_model_configs.json", "r") as f:    
+    model_configs = json.load(f)    
+    
+with st.sidebar.title("Model Parameters", anchor="top", help='''The model parameters are used to control the behavior of the model.     
+                      Each parameter has its own tooltip.'''):    
+    with settings_container:    
+        available_models = list(model_configs.keys())    
+        available_models.remove("common_params")  # Exclude common parameters from model options    
+    
+        default_index = available_models.index("gpt-35-turbo-16k")    
+    
+        model = st.sidebar.selectbox("Choose a model:", available_models, key="modelkey", index=default_index,    
+                                    help='''Choose the model with which you wish to interact. Defaults to gpt-35-turbo-16k.''')    
+        st.session_state.engine = model  # Update the engine according to the chosen model  
+    
+        # Explicitly initialize session state for model parameters    
+        st.session_state.temperature = st.session_state.get('temperature', 0.7)  
+        st.session_state.max_tokens = st.session_state.get('max_tokens', 4000)  
+        st.session_state.top_p = st.session_state.get('top_p', 0.9)  
+        st.session_state.frequency_penalty = st.session_state.get('frequency_penalty', 0.0)  
+        st.session_state.presence_penalty = st.session_state.get('presence_penalty', 0.0)  
+    
+        common_params = model_configs["common_params"]    
+        specific_params = model_configs.get(model, {})    
+        params = {**common_params, **specific_params}  # Merge dictionaries    
+    
+        system_message = st.sidebar.text_area("System Message",    
+                                            value=st.session_state.system,    
+                                            height=150,    
+                                            key="txtSystem",    
+                                            help='''Enter a system message here.''')    
+    
+        if system_message != st.session_state.system:    
+            st.sidebar.warning('''WARNING: You have made changes to the system message.''')    
+    
+        # Read in the appropriate model specific parameters for the streamlit sliders    
+        temperature = st.sidebar.slider("Set a Temperature:", min_value=params['temp_min'], max_value=params['temp_max'], value=st.session_state.temperature,    
+                                        step=params['temp_step'], help=params['temp_help'], key="tempkey")    
+        max_tokens = st.sidebar.slider("Set Max Tokens per Response:", min_value=params['tokens_min'], max_value=params['tokens_max'], value=st.session_state.max_tokens,    
+                                       step=params['tokens_step'], help=params['tokens_help'], key="tokenskey")    
+        top_p = st.sidebar.slider("Set a Top P:", min_value=params['top_p_min'], max_value=params['top_p_max'], value=st.session_state.top_p,    
+                                  step=params['top_p_step'], help=params['top_p_help'], key="top_pkey")    
+        frequency_penalty = st.sidebar.slider("Set a Frequency Penalty:", min_value=params['frequency_penalty_min'], max_value=params['frequency_penalty_max'], value=st.session_state.frequency_penalty,    
+                                               step=params['frequency_penalty_step'], help=params['frequency_penalty_help'], key="frequency_penaltykey")    
+        presence_penalty = st.sidebar.slider("Set a Presence Penalty:", min_value=params['presence_penalty_min'], max_value=params['presence_penalty_max'], value=st.session_state.presence_penalty,    
+                                             step=params['presence_penalty_step'], help=params['presence_penalty_help'], key="presence_penaltykey")    
+    
+        if st.sidebar.button("Save Settings", key="saveButton", help='''Save the model parameter settings to the session state.''', type="primary"):        
+            st.sidebar.success('Settings saved successfully!', icon="✅")    
+            
+        if st.sidebar.button("Clear Chat History", key="mainChatClear", help='''Clear the chat history from the session state.''', type="secondary"):    
+            st.session_state.messages = []    
+            st.session_state.messages.append({"role":"system","content":standard_system_message})    
+            st.session_state["user_message"] = ""    
+            st.session_state["assistant_message"] = ""    
+            helpers.save_session_state()    
+    
+    token_counter_container = st.sidebar.container()    
+    with token_counter_container:    
+        st.empty()    
+        st.caption(f":red[_____________________________________]")    
+        model = helpers.translate_engine_to_model(st.session_state.engine)    
+        system_tokens = helpers.num_tokens_from_messages([st.session_state.messages[0]], model)    
+        user_tokens = helpers.num_tokens_from_messages([msg for msg in st.session_state.messages if msg["role"] == "user"], model)    
+        assistant_tokens = helpers.num_tokens_from_messages([msg for msg in st.session_state.messages if msg["role"] == "assistant"], model)    
+        total_tokens = system_tokens + user_tokens + assistant_tokens    
+    
+        st.write(f"System tokens: {system_tokens}")    
+        st.write(f"User tokens: {user_tokens}")    
+        st.write(f"Assistant tokens: {assistant_tokens}")    
+        st.write(f"Total tokens: {total_tokens}")    
+    
+        max_tokens_progress = params['tokens_max']    
+        progress = total_tokens / max_tokens_progress    
+        st.progress(progress)    
+    
+with chat_container:    
+    if st.session_state['messages']:    
+        for message in st.session_state.messages:    
+            if message["role"] != "system":    
+                with st.chat_message(message["role"]):    
+                    st.markdown(message["content"])      
+    
+    if prompt := st.chat_input("💬 Window - Go ahead and type!"):    
+        st.session_state.messages.append({"role": "user", "content": prompt})    
+        with st.chat_message("user"):    
+            st.markdown(prompt)    
+    
+        with st.chat_message("assistant"):    
+            message_placeholder = st.empty()    
+            full_response = ""    
+    
+            for response in helpers.generate_chat_completion(client=st.session_state.client,    
+                                                             engine=st.session_state.engine,    
+                                                             messages=[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],    
+                                                            temperature=st.session_state.temperature,    
+                                                            max_tokens=st.session_state.max_tokens,    
+                                                            top_p=st.session_state.top_p,    
+                                                            frequency_penalty=st.session_state.frequency_penalty,    
+                                                            presence_penalty=st.session_state.presence_penalty,    
+                                                            stop=None,    
+                                                            stream=True):    
+    
+                if response.choices and len(response.choices) > 0:    
+                    full_response += response.choices[0].delta.content or ""    
+                message_placeholder.markdown(full_response + "▌")    
+            message_placeholder.markdown(full_response)    
+        st.session_state.messages.append({"role": "assistant", "content": full_response})    
+    
+with footer_container:    
+    st.caption(f":red[______________________________________________________________________________________________]")    
+    st.caption(f":red[NOTE: ALL SYSTEM MESSAGES, PROMPTS, AND COMPLETIONS ARE LOGGED FOR THIS DEMO. DO NOT ENTER ANY SENSITIVE INFORMATION.]")    
+
+```
+
+2. aoai_helpers.py
+```python
+import os, requests, html, tiktoken
+import streamlit as st
+from openai import AzureOpenAI
+
+# ############################################################
+# Azure OpenAI helper functions
+# ############################################################
+def generate_chat_completion(client, engine, messages, temperature, max_tokens, top_p, frequency_penalty, presence_penalty, stop, stream):
+    '''
+    Generates a chat completion based on the provided messages.
+    '''
+    try:
+        response = client.chat.completions.create(
+            model=engine,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=top_p,
+            frequency_penalty=frequency_penalty,
+            presence_penalty=presence_penalty,
+            stop=stop,
+            stream=stream
+        )
+        return response
+    except AzureOpenAI.error.RateLimitError as e:
+        raise e
+
+# Bing Search helper function
+def bing_web_search(api_key, query: str, output_format: str ='html', **kwargs) -> str:
+    """
+    Perform a search using the Bing Web Search v7.0 API with error handling, support for various query parameters and
+    advanced search keywords in the query. Outputs a string that can be displayed in either Markdown or HTML table format
+    and including additional details about the search results.
+
+    Args:
+        api_key (str): The API key for accessing the Bing Web Search API.
+        query (str): The user's search query term. Must not be empty.
+        output_format (str): The format of the output, either 'markdown' or 'html'. Default is 'html'.
+        **kwargs: Arbitrary keyword arguments representing additional query parameters supported by the API.
+        advanced key words found here: https://support.microsoft.com/en-us/topic/advanced-search-keywords-ea595928-5d63-4a0b-9c6b-0b769865e78a
+
+    Returns:
+        str: A table with the search results in the specified format or an error message, including additional details.
+
+    Example:
+        >>> api_key = 'YOUR_BING_API_KEY'
+        >>> query = 'How do I use tools and function calling? site:https://learn.microsoft.com/'
+        >>> output = bing_web_search(api_key, query, output_format='html', count=50, mkt='en-US')
+        >>> display(HTML(output))
+    """  
+    base_url = "https://api.bing.microsoft.com/v7.0/search"  
+    headers = {"Ocp-Apim-Subscription-Key": api_key}  
+    params = {"q": query}  
+    params.update(kwargs)  
+  
+    try:  
+        response = requests.get(base_url, headers=headers, params=params)  
+        response.raise_for_status()  
+    except requests.exceptions.HTTPError as err:  
+        return f"HTTP Error: {err}"  
+    except requests.exceptions.RequestException as e:  
+        return f"Error: {e}"  
+  
+    results = response.json()  
+  
+    if 'webPages' not in results:  
+        return "No results found or the query was invalid."  
+  
+    if output_format == 'markdown':  
+        table = "Name (URL) | Snippet | Last Updated | Type\n"  
+        table += "--- | --- | --- | ---\n"  
+    elif output_format == 'html':  
+        table = "<table><tr><th>Name (URL)</th><th>Snippet</th><th>Last Updated</th><th>Type</th></tr>"  
+  
+    for item in results.get("webPages", {}).get("value", []):  
+        name = html.escape(item.get("name", "N/A"))  
+        url = item.get("url", "N/A")  
+        snippet = item.get("snippet", "N/A").replace("\n", " ")  
+        last_updated = item.get("dateLastCrawled", "N/A")[:10]  # Extract just the date  
+        result_type = "Web page"  # In this context, all results are web pages  
+          
+        # Handle snippet highlighting  
+        if output_format == 'html':  
+            snippet = html.escape(snippet, quote=False)  
+        else:  # For Markdown, convert highlight tags from HTML to Markdown if present  
+            snippet = snippet.replace('<strong>', '**').replace('</strong>', '**')  
+          
+        # Format the name and URL as a clickable link  
+        if output_format == 'html':  
+            link = f"<a href='{url}'>{name}</a>"  
+        else:  # Markdown  
+            link = f"[{name}]({url})"  
+          
+        # Build the table row  
+        if output_format == 'markdown':  
+            table += f"{link} | {snippet} | {last_updated} | {result_type}\n"  
+        elif output_format == 'html':  
+            table += f"<tr><td>{link}</td><td>{snippet}</td><td>{last_updated}</td><td>{result_type}</td></tr>"  
+  
+    table += "</table>" if output_format == 'html' else ""  
+  
+    return table
+
+# ############################################################
+# Tiktoken helper functions
+# ############################################################
+def translate_engine_to_model(engine):
+    '''
+    Translates the engine name to the model name for use with 
+    tiktoken.encoding_for_model for token tracking.
+    '''
+    try:
+        engine_model_dict = {"gpt-35-turbo-0301" : "gpt-3.5-turbo",
+                             "gpt-35-turbo-0613" : "gpt-3.5-turbo",
+                             "gpt-35-turbo-1106" : "gpt-3.5-turbo",
+                             "gpt-35-turbo-16k" : "gpt-3.5-turbo-16k-0613",
+                             "gpt-4" : "gpt-4-0613",
+                             "gpt-4-32k" : "gpt-4-32k-0613",
+                             "gpt-4-turbo" : "gpt-4-32k-0613"}
+        model = engine_model_dict.get(engine)
+        if model is None:
+            raise KeyError(f"Engine {engine} not found. Please use one of the following: {list(engine_model_dict.keys())}")
+        return model
+    except KeyError:
+        engine_model_dict = {"gpt-35-turbo-0301" : "gpt-3.5-turbo",
+                             "gpt-35-turbo-0613" : "gpt-3.5-turbo",
+                             "gpt-35-turbo-1106" : "gpt-3.5-turbo",
+                             "gpt-35-turbo-16k" : "gpt-3.5-turbo-16k-0613",
+                             "gpt-4" : "gpt-4-0613",
+                             "gpt-4-32k" : "gpt-4-32k-0613",
+                             "gpt-4-turbo" : "gpt-4-32k-0613"}
+        raise KeyError(f"Engine {engine} not found. Please use one of the following: {list(engine_model_dict.keys())}")
+
+def num_tokens_from_messages(messages, model):
+    """Return the number of tokens used by a list of messages."""
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+    except KeyError:
+        print("Warning: model not found. Using cl100k_base encoding.")
+        encoding = tiktoken.get_encoding("cl100k_base")
+    if model in {
+        "gpt-3.5-turbo",
+        "gpt-3.5-turbo-16k-0613",
+        "gpt-4-0314",
+        "gpt-4-32k-0314",
+        "gpt-4-0613",
+        "gpt-4-32k-0613",
+        }:
+        tokens_per_message = 3
+        tokens_per_name = 1
+    elif model == "gpt-3.5-turbo-0301":
+        tokens_per_message = 4  # every message follows <|start|>{role/name}\n{content}<|end|>\n
+        tokens_per_name = -1  # if there's a name, the role is omitted
+    elif "gpt-3.5-turbo" in model:
+        print("Warning: gpt-3.5-turbo may update over time. Returning num tokens assuming gpt-3.5-turbo-0613.")
+        return num_tokens_from_messages(messages, model="gpt-3.5-turbo-0613")
+    elif "gpt-4" in model:
+        print("Warning: gpt-4 may update over time. Returning num tokens assuming gpt-4-0613.")
+        return num_tokens_from_messages(messages, model="gpt-4-0613")
+    else:
+        raise NotImplementedError(
+            f"""num_tokens_from_messages() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how messages are converted to tokens."""
+        )
+    num_tokens = 0
+    for message in messages:
+        num_tokens += tokens_per_message
+        for key, value in message.items():
+            num_tokens += len(encoding.encode(value))
+            if key == "name":
+                num_tokens += tokens_per_name
+    num_tokens += 3  # every reply is primed with <|start|>assistant<|message|>
+    return num_tokens
+
+# ############################################################
+# Streamlit session state helper functions
+# ############################################################
+def env_to_st_session_state(setting_name, session_name, default_value):  
+    """  
+    Function to generate st.session_state variables from environment variables.  
+    """  
+    if session_name not in st.session_state:  
+        if os.environ.get(setting_name) is not None:
+            st.session_state[session_name] = os.environ.get(setting_name)
+        else:
+            st.session_state[session_name] = default_value
+
+def load_settings(reload_api_settings=True):  
+    """  
+    Loads settings for the sidebar options, API configurations, and model parameters.  
+    Ensures that default values are used only if session state variables are not already set.  
+    """  
+    # Model parameters initialization  
+    model_parameters = {  
+        'temperature': 0.7,  
+        'maxtokens': 4000,  
+        'topp': 0.90,  
+        'frequencypenalty': 0.0,  
+        'presencepenalty': 0.0,  
+        'engine': 'gpt-35-turbo-16k',  # Default model  
+        'system': 'You are an AI assistant that helps people.'  
+    }  
+    for param, default_value in model_parameters.items():  
+        if param not in st.session_state:  
+            st.session_state[param] = default_value  
+  
+    # API settings initialization (only if reload_api_settings is True)  
+    if reload_api_settings:  
+        api_settings = {  
+            'apiversion': '2023-12-01-preview',  
+            'apikey': '',  
+            'apiendpoint': ''  
+        }  
+        for setting, default_value in api_settings.items():  
+            env_to_st_session_state(setting.upper(), setting, default_value)  
+
+def toggle_settings():
+    st.session_state['show_settings'] = not st.session_state['show_settings']
+
+def save_session_state():  
+    # Update this function to only save variables that are used and initialized within the app  
+    st.session_state.client = st.session_state.client  
+    st.session_state.engine = st.session_state.engine  
+    st.session_state.temperature = st.session_state.temperature  
+    st.session_state.max_tokens = st.session_state.max_tokens  
+    st.session_state.top_p = st.session_state.top_p  
+    st.session_state.frequency_penalty = st.session_state.frequency_penalty  
+    st.session_state.presence_penalty = st.session_state.presence_penalty  
+    st.session_state.system = st.session_state.system  
+    # Update the system message in the first message if it is of type 'system'  
+    if st.session_state.messages and st.session_state.messages[0]['role'] == 'system':  
+        st.session_state.messages[0]['content'] = st.session_state.system  
+```
+
+3. aoai_model_configs.json
+```json
+{  
+  "gpt-35-turbo-0301": {  
+    "tokens_max": 4000  
+  },  
+  "gpt-35-turbo-0613": {  
+    "tokens_max": 4000  
+  },  
+  "gpt-35-turbo-1106": {  
+    "tokens_max": 16000  
+  },  
+  "gpt-35-turbo-16k": {  
+    "tokens_max": 16000,  
+    "tokens_help": "The API supports a maximum of 16,000 tokens shared between the prompt (including system message, examples, message history, and user query) and the model's response. One token is roughly 4 characters for typical English text."  
+  },  
+  "gpt-4": {  
+    "tokens_max": 8192  
+  },  
+  "gpt-4-32k": {  
+    "tokens_max": 32768,  
+    "tokens_help": "The API supports a maximum of 32,768 tokens shared between the prompt (including system message, examples, message history, and user query) and the model's response. One token is roughly 4 characters for typical English text."  
+  },  
+  "gpt-4-turbo": {  
+    "tokens_max": 4096,  
+    "tokens_help": "The API supports a maximum of 4,096 tokens for its output. HOWEVER, it has a 128,000 token context window, so large amounts of text may be submitted but it will still be limited to the 4,096 max token output in a single response. You can ask it to continue to keep providing output if it cuts off mid-sentence."  
+  },  
+  "common_params": {  
+    "tokens_min": 10,  
+    "tokens_step": 10,  
+    "temp_min": 0.00,  
+    "temp_max": 2.00,  
+    "temp_step": 0.01,  
+    "top_p_min": 0.00,  
+    "top_p_max": 1.00,  
+    "top_p_step": 0.01,  
+    "frequency_penalty_min": -2.00,  
+    "frequency_penalty_max": 2.00,  
+    "frequency_penalty_step": 0.01,  
+    "presence_penalty_min": -2.00,  
+    "presence_penalty_max": 2.00,  
+    "presence_penalty_step": 0.01,  
+    "tokens_help": "Set a limit on the number of tokens per model response. The API supports a maximum of 4000 tokens shared between the prompt (including system message, examples, message history, and user query) and the model's response. One token is roughly 4 characters for typical English text.",  
+    "temp_help": "Controls randomness. Lowering the temperature means that the model will produce more repetitive and deterministic responses. Increasing the temperature will result in more unexpected or creative responses. Try adjusting temperature or Top P but not both.",  
+    "top_p_help": "Similar to temperature, this controls randomness but uses a different method, called nucleus sampling where the model considers the results of the tokens with top_p probability mass. So 0.1 means only the tokens comprising the top 10% probability mass are considered. Lowering Top P will narrow the model’s token selection to likelier tokens. Increasing Top P will let the model choose from tokens with both high and low likelihood. Try adjusting temperature or Top P but not both.",  
+    "frequency_penalty_help": "Number between -2.0 and 2.0. Reduce the chance of repeating a token proportionally based on how often it has appeared in the text so far. This decreases the likelihood of repeating the exact same text in a response.",  
+    "presence_penalty_help": "Number between -2.0 and 2.0. Reduce the chance of repeating any token that has appeared in the text at all so far. This increases the likelihood of introducing new topics in a response."  
+  }  
+}
+```
